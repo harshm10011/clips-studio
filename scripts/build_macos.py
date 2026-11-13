@@ -314,6 +314,31 @@ def check_host() -> None:
         raise RuntimeError(f"At least {MIN_FREE_GB} GB free disk space is required for the one-dir backend and installers.")
 
 
+def check_release_credentials() -> None:
+    """Stop before a costly build unless Developer ID signing and notarization are ready."""
+    result = run(["security", "find-identity", "-v", "-p", "codesigning"], capture=True)
+    if "Developer ID Application:" not in result.stdout:
+        raise RuntimeError(
+            "A valid Developer ID Application identity is required. Install its certificate "
+            "and matching private key in Keychain Access; this Mac currently has none."
+        )
+
+    apple_id_auth = all(os.environ.get(key) for key in (
+        "APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_TEAM_ID"
+    ))
+    api_key_auth = all(os.environ.get(key) for key in (
+        "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"
+    ))
+    keychain_auth = all(os.environ.get(key) for key in (
+        "APPLE_KEYCHAIN", "APPLE_KEYCHAIN_PROFILE"
+    ))
+    if not (apple_id_auth or api_key_auth or keychain_auth):
+        raise RuntimeError(
+            "Apple notarization credentials are missing. Configure an App Store Connect API key, "
+            "an Apple ID app-specific password, or a notarytool Keychain profile."
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ffmpeg-dir", type=Path,
@@ -327,6 +352,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         check_host()
+        check_release_credentials()
         if not args.skip_ffmpeg_stage:
             stage_ffmpeg(args.ffmpeg_dir)
         if not args.skip_ollama_fetch:

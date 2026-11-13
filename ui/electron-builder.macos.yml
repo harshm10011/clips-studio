@@ -40,9 +40,9 @@ mac:
   icon: build/icon.icns
   category: public.app-category.video
   artifactName: ClipForge-${version}-${arch}.${ext}
-  # Release signing is activated by the build driver only when the developer
-  # identity and hardened-runtime entitlements have been configured.
-  identity: null
+  hardenedRuntime: true
+  notarize: true
 
 publish: []
 compression: store
+forceCodeSigning: true

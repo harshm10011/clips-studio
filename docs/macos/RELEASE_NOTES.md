@@ -30,8 +30,8 @@ Apple Silicon resource controls.
 ## Known gaps
 
 - A local ARM64 `.app`, DMG, and ZIP have been produced.
-- The app is ad-hoc/unsigned and is not notarized. Gatekeeper may block it on
-  another Mac; this preview is for local development use.
+- The app is ad-hoc/unsigned and is not notarized. This Mac's distribution
+  assessment rejects it; this preview is not safe to distribute or install.
 - No end-to-end local video render, model recovery, insufficient-disk,
   interrupted-job, long-video, or batch export run has been completed on the
   packaged app. The frozen backend's `/health` smoke check passed, but the

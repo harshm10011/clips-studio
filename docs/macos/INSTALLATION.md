@@ -10,8 +10,11 @@ release channel. Do not describe this build as stable.
 
 Build on a native ARM64 Mac with Xcode Command Line Tools, Node.js/npm, Python
 3.11, and at least 30 GB of free disk space. Python 3.11 is required by the
-plugin runtime. Use a clean virtual environment so the generated inventory
-matches the build environment:
+plugin runtime. For a distributable build, also install a valid Developer ID
+Application identity in Keychain and configure Apple notarization credentials.
+The release builder checks both before doing the expensive freeze and fails
+instead of producing another unsigned installer. Use a clean virtual
+environment so the generated inventory matches the build environment:
 
 ```sh
 python3.11 -m venv .venv-macos
@@ -30,7 +33,25 @@ FFmpeg can come from `PATH` or a directory passed with `--ffmpeg-dir`.
 
 The builder exits when prerequisites are missing. It needs `ffmpeg` and
 `ffprobe` with VideoToolbox H.264 and `libx264`, the pinned Ollama runtime,
-Python 3.11 backend dependencies, and the complete UI dependency install.
+Python 3.11 backend dependencies, the complete UI dependency install, a
+Developer ID Application certificate with its private key in Keychain, and
+Apple notarization credentials. Electron Builder signs with hardened runtime,
+submits to Apple's notarization service, and staples the accepted ticket.
+
+For App Store Connect API key authentication, keep the `.p8` key out of the
+repository and set these variables in the build shell:
+
+```sh
+export APPLE_API_KEY="/secure/path/AuthKey_KEYID.p8"
+export APPLE_API_KEY_ID="KEYID"
+export APPLE_API_ISSUER="issuer-uuid"
+python scripts/build_macos.py
+```
+
+The code-signing identity must appear in `security find-identity -v -p
+codesigning` as `Developer ID Application`. Apple documents the certificate
+and notarization setup in its [Developer ID certificate guide](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)
+and [notarization guide](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
 ## Install a built DMG
 
@@ -41,10 +62,11 @@ Python 3.11 backend dependencies, and the complete UI dependency install.
    and available disk space. The recommended local language model is fetched
    on first use and stored under `~/Library/Application Support/ClipForge`.
 
-Current developer builds are unsigned. macOS may block opening them; a public
-release requires a Developer ID signature, hardened-runtime entitlements,
-notarization, stapling, and a clean install test on a second Mac. Apple
-distribution credentials are not part of this repository.
+The current preview remains unsigned and is blocked by this Mac's Gatekeeper
+assessment. After signing and notarization, validate the fresh app and DMG with
+`codesign --verify --deep --strict`, `spctl --assess --type execute`, and
+`xcrun stapler validate`, then test installation on a second Mac. Apple
+distribution credentials are stored locally and are not part of this repository.
 
 ## Data and permissions
 
