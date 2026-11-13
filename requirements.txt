@@ -73,7 +73,7 @@ curl_cffi>=0.15.0,<0.16
 # <6, not <8: 6 and 7 exist but have never run here. Same rule as the rest —
 # the ceiling sits at the major that is actually tested.
 psutil>=5.9.8,<6
-nvidia-ml-py>=12.575.51,<14
+nvidia-ml-py>=12.575.51,<14 ; sys_platform != "darwin"
 
 # ---- AI dubbing --------------------------------------------------------
 # Bundled since 1.1.3. It was previously left out on purpose so an installed

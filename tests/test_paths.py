@@ -34,6 +34,7 @@ def test_installed_build_uses_per_user_storage(monkeypatch, tmp_path):
     executable in Program Files."""
     local_appdata = tmp_path / "AppData" / "Local"
     monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(paths.sys, "platform", "win32")
     monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
 
     got = resolve_data_dir({"paths": {"data_dir": "data"}})
@@ -42,6 +43,21 @@ def test_installed_build_uses_per_user_storage(monkeypatch, tmp_path):
     assert got == local_appdata / "Clips Studio" / "data"
     # Never beside the executable, wherever that happens to be installed.
     assert Path(sys.executable).parent not in got.parents
+
+
+def test_installed_macos_uses_application_support(monkeypatch, tmp_path):
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(paths.sys, "platform", "darwin")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+
+    app_dir = tmp_path / "Library" / "Application Support" / "ClipForge"
+    assert resolve_data_dir({"paths": {"data_dir": "data"}}) == app_dir / "data"
+
+    bundled = tmp_path / "app" / "config" / "settings.yaml"
+    bundled.parent.mkdir(parents=True)
+    bundled.write_text("model: gemma3:4b\n", encoding="utf-8")
+    assert user_config_path(bundled) == app_dir / "settings.yaml"
 
 
 def test_absolute_path_is_honoured(monkeypatch, tmp_path):
@@ -88,6 +104,7 @@ def test_installed_build_writes_settings_where_the_user_can(monkeypatch, tmp_pat
     bundled.write_text("model: gemma3:4b\n", encoding="utf-8")
 
     monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(paths.sys, "platform", "win32")
     monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
 
     got = user_config_path(bundled)
@@ -109,6 +126,7 @@ def test_an_existing_installs_settings_are_carried_over(monkeypatch, tmp_path):
     bundled.write_text("model: gemma3:27b\nclips:\n  min_score: 8\n", encoding="utf-8")
 
     monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(paths.sys, "platform", "win32")
     monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
 
     got = user_config_path(bundled)
@@ -129,6 +147,7 @@ def test_unwritable_appdata_falls_back_to_the_bundled_copy(monkeypatch, tmp_path
     bundled.write_text("model: gemma3:4b\n", encoding="utf-8")
 
     monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(paths.sys, "platform", "win32")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "nope"))
     monkeypatch.setattr(
         paths.shutil, "copyfile", lambda *a, **k: (_ for _ in ()).throw(OSError("read-only"))

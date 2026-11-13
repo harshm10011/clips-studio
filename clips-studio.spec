@@ -1,4 +1,4 @@
-# PyInstaller spec — freezes the Python engine into resources/backend/api.exe
+# PyInstaller spec — freezes the Python engine into resources/backend/api[.exe]
 #
 # Build with:  python scripts/build_installer.py     (don't call this directly)
 #
@@ -41,8 +41,16 @@ hiddenimports = []
 #                  only has cuBLAS 13 (transcription/transcriber.py, #111)
 for package in ("yt_dlp", "yt_dlp_ejs", "ultralytics", "faster_whisper", "ctranslate2",
                 "curl_cffi", "piper", "onnxruntime", "rapidocr_onnxruntime",
-                "shapely", "pyclipper", "nvidia.cublas"):
+                "shapely", "pyclipper"):
     pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
+    datas += pkg_datas
+    binaries += pkg_binaries
+    hiddenimports += pkg_hidden
+
+# CTranslate2 loads NVIDIA's CUDA 12 cuBLAS on Windows GPU runs. Apple
+# Silicon uses a separate acceleration path and must not try to bundle CUDA.
+if sys.platform == "win32":
+    pkg_datas, pkg_binaries, pkg_hidden = collect_all("nvidia.cublas")
     datas += pkg_datas
     binaries += pkg_binaries
     hiddenimports += pkg_hidden

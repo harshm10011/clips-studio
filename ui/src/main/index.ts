@@ -44,6 +44,23 @@ const OLLAMA_HOST = `127.0.0.1:${OLLAMA_PORT}`
 let backend: ChildProcess | null = null
 let ollama: ChildProcess | null = null
 
+/** Large model and video files belong in a stable per-user data folder, not
+ *  Electron's Local Storage directory or the installed application bundle. */
+function installedDataRoot(): string {
+  if (process.platform === 'darwin') {
+    return join(app.getPath('appData'), 'ClipForge')
+  }
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA ?? join(app.getPath('home'), 'AppData', 'Local')
+    return join(localAppData, 'Clips Studio')
+  }
+  if (process.platform === 'linux') {
+    const xdgDataHome = process.env.XDG_DATA_HOME ?? join(app.getPath('home'), '.local', 'share')
+    return join(xdgDataHome, 'clipforge')
+  }
+  return join(app.getPath('userData'), 'ClipForge')
+}
+
 // The engine's plugin-manager routes (install, turn on and off, remove) need
 // this in an X-Clips-Kitty-Session header, so a web page or a stray script
 // can't drive them. New at each start; only this app's own window is given
@@ -255,30 +272,32 @@ function startOllama(): void {
 
   // PyInstaller puts bundled data under _internal/, which is where the spec
   // places the runtime — the same shape as _internal/ffmpeg.
-  const exe = join(process.resourcesPath, 'backend', '_internal', 'ollama', 'ollama.exe')
+  const ollamaExecutable = process.platform === 'win32' ? 'ollama.exe' : 'ollama'
+  const exe = join(process.resourcesPath, 'backend', '_internal', 'ollama', ollamaExecutable)
 
   // Models are gigabytes, so they live with the creator's other big files
   // rather than in their user profile. This must match how data_dir resolves
   // in core/paths.py, or the engine and the runtime disagree about what is
   // downloaded.
-  const localAppData = process.env.LOCALAPPDATA ?? join(app.getPath('home'), 'AppData', 'Local')
-  const dataDir = join(localAppData, 'Clips Studio', 'data')
-  // The 1.1.3 rename (d708b34) moved this folder to "Clips Kitty" while
-  // core/paths.py rightly kept the data folder at "Clips Studio", so the two
-  // stopped matching: models from earlier versions were stranded and fetched
-  // again. Keep whichever folder already holds models, so 1.1.3 and 1.1.4
-  // installs keep theirs; otherwise use the data folder's own name.
-  const kittyModels = join(localAppData, 'Clips Kitty', 'data', 'models')
-  const models = existsSync(join(kittyModels, 'manifests')) ? kittyModels : join(dataDir, 'models')
+  const dataDir = join(installedDataRoot(), 'data')
+  // On Windows, the 1.1.3 rename (d708b34) moved the models folder to
+  // "Clips Kitty" while core/paths.py kept the data folder at "Clips Studio".
+  // Keep whichever folder already holds models so existing Windows installs
+  // do not fetch them again. macOS uses the new ClipForge data root.
+  let models = join(dataDir, 'models')
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA ?? join(app.getPath('home'), 'AppData', 'Local')
+    const kittyModels = join(localAppData, 'Clips Kitty', 'data', 'models')
+    if (existsSync(join(kittyModels, 'manifests'))) models = kittyModels
+  }
 
   // Unfinished downloads kept for resuming (OLLAMA_NOPRUNE below) that have
   // sat untouched for a week are deleted first, while Ollama isn't running.
   const dropped = dropStalePartials(models)
 
-  // Ollama's own output goes to %LOCALAPPDATA%\Clips Studio\data\logs\ollama.log,
-  // the default data folder's logs. A data_dir set in settings.yaml moves the
-  // job logs but not this file. It used to go nowhere, so a download that
-  // failed inside Ollama left nothing to read.
+  // Ollama's own output goes into this install's data folder. A data_dir set
+  // in settings.yaml moves the job logs but not this file. This keeps a local
+  // error record when a model download fails.
   const log = openOllamaLog(join(dataDir, 'logs'))
   if (log !== null && dropped.length > 0) {
     try {
@@ -384,7 +403,8 @@ function startBackend(): void {
   // Dev: run the repo's Python directly (repo root is one level up from ui/).
   // Packaged: run the frozen backend exe shipped in resources/backend/.
   if (app.isPackaged) {
-    const exe = join(process.resourcesPath, 'backend', 'api.exe')
+    const backendExecutable = process.platform === 'win32' ? 'api.exe' : 'api'
+    const exe = join(process.resourcesPath, 'backend', backendExecutable)
     // The backend is built as a console app so its prints have somewhere to
     // go (a windowed build gives it no stdout, and every print() then
     // throws). windowsHide keeps that console from flashing up at the user.

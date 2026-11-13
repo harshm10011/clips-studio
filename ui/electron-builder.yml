@@ -139,6 +139,20 @@ nsis:
   # downloaded videos, rendered clips and learned creator profiles. Removing
   # a program should never delete someone's footage.
 
+# Apple Silicon development target. The native backend must be frozen on an
+# ARM64 Mac into build/dist/backend before running package:mac:arm64. The ZIP
+# is kept beside the DMG so electron-updater has a macOS update payload.
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  category: public.app-category.video
+  artifactName: ClipsKitty-${version}-${arch}.${ext}
+
 nsisWeb:
   artifactName: ClipsKitty-Web-Setup-${version}.${ext}
 

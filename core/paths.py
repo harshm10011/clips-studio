@@ -15,6 +15,28 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _installed_app_dir() -> Path:
+    """A stable, user-writable root for data owned by an installed app.
+
+    Keep the existing Windows directory name so Windows upgrades retain their
+    libraries. A new Mac install uses the normal Application Support location.
+    Linux follows XDG_DATA_HOME for completeness, although this project does
+    not currently package a Linux desktop application.
+    """
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "ClipForge"
+
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+        return base / "Clips Studio"
+
+    if sys.platform.startswith("linux"):
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+        return base / "clipforge"
+
+    return Path.home() / ".clipforge"
+
+
 def resolve_data_dir(config: dict) -> Path:
     """The absolute directory for this install's data.
 
@@ -42,8 +64,7 @@ def resolve_data_dir(config: dict) -> Path:
         # every existing user's library, settings, creator profiles and clips
         # already live. Renaming it makes an upgrade look like a factory reset.
         # No user ever sees this string. Leave it.
-        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
-        return base / "Clips Studio" / raw
+        return _installed_app_dir() / raw
 
     # Checkout: next to the code, not next to the terminal.
     return _REPO_ROOT / raw
@@ -109,10 +130,7 @@ def user_config_path(bundled: Path) -> Path:
     if not getattr(sys, "frozen", False):
         return bundled
 
-    base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
-    # Same folder as resolve_data_dir, and kept under the pre-1.1.3 name for
-    # the same reason — see the note there before changing it.
-    user_copy = base / "Clips Studio" / bundled.name
+    user_copy = _installed_app_dir() / bundled.name
 
     if not user_copy.exists():
         try:
