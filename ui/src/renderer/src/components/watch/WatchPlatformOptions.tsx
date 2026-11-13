@@ -75,7 +75,7 @@ export default function WatchPlatformOptions({
     <label className="text-sm flex items-center gap-2 cursor-pointer">
       <input
         type="checkbox"
-        className="size-4 accent-[#38BDF8]"
+        className="size-4 accent-control"
         checked={flag(platform, key, fallback)}
         onChange={(e) => set(platform, key, e.target.checked)}
       />

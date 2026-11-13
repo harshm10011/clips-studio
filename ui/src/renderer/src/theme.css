@@ -1,14 +1,14 @@
 @import 'tailwindcss';
 
-/* Navy + sky design tokens (see DESIGN-V2.md, "Visual theme") */
+/* Graphite + violet design tokens for the desktop studio. */
 @theme {
-  --color-base: #0a1628;
-  --color-surface: #13243d;
-  --color-raised: #1c3354;
-  --color-accent: #38bdf8;
-  --color-accent-strong: #0ea5e9;
-  --color-ink: #f1f5f9;
-  --color-muted: #94a3b8;
+  --color-base: #111115;
+  --color-surface: #19191f;
+  --color-raised: #292831;
+  --color-accent: #a78bfa;
+  --color-accent-strong: #8b5cf6;
+  --color-ink: #f4f2f8;
+  --color-muted: #a5a2ad;
   --color-success: #34d399;
   --color-warn: #fbbf24;
   --color-error: #f87171;
@@ -16,7 +16,19 @@
 
 body {
   @apply bg-base text-ink antialiased;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* The macOS title bar is hidden so the native traffic lights sit over the
+   window. Reserve their space before the sidebar and page content begin. */
+#root.mac-window {
+  box-sizing: border-box;
+  padding-top: 40px;
+  background: var(--color-base);
+}
+
+.accent-control {
+  accent-color: var(--color-accent);
 }
 
 /* Accessibility (WCAG 2.1 / AODA):

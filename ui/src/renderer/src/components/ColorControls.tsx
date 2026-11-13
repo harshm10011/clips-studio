@@ -141,7 +141,7 @@ export default function ColorControls({
               min={min}
               max={max}
               value={Math.round(adjust[key] * 100)}
-              className="w-full accent-[#38BDF8]"
+              className="w-full accent-control"
               onChange={(e) => setAdjust((a) => ({ ...a, [key]: Number(e.target.value) / 100 }))}
             />
           </div>

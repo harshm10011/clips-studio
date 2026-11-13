@@ -170,7 +170,7 @@ export default function WatchPublishSettings({
               <input
                 type="radio"
                 name={`publish-mode-${watch.id}`}
-                className="size-4 accent-[#38BDF8]"
+                className="size-4 accent-control"
                 checked={mode === m.id}
                 onChange={() => setMode(m.id)}
               />
@@ -226,7 +226,7 @@ export default function WatchPublishSettings({
                     <label key={id} className="flex items-center gap-2 cursor-pointer text-sm">
                       <input
                         type="checkbox"
-                        className="size-4 accent-[#38BDF8]"
+                        className="size-4 accent-control"
                         checked={platforms.includes(id)}
                         onChange={(e) =>
                           setPlatforms((prev) =>
@@ -263,7 +263,7 @@ export default function WatchPublishSettings({
             <label className="flex items-center gap-2 cursor-pointer text-sm">
               <input
                 type="checkbox"
-                className="size-4 accent-[#38BDF8]"
+                className="size-4 accent-control"
                 checked={!aiHashtags}
                 onChange={(e) => setAiHashtags(!e.target.checked)}
               />

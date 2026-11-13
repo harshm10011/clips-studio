@@ -426,7 +426,7 @@ export default function FeedbackHub(): JSX.Element {
                   <label className="flex items-center gap-2 cursor-pointer text-sm">
                     <input
                       type="checkbox"
-                      className="size-4 accent-[#38BDF8]"
+                      className="size-4 accent-control"
                       checked={includeDiag}
                       onChange={(e) => setIncludeDiag(e.target.checked)}
                     />

@@ -1003,7 +1003,7 @@ export default function GamingLayoutEditor({
                 max={0.98}
                 step={0.01}
                 value={scrub}
-                className="flex-1 accent-[#38BDF8]"
+                className="flex-1 accent-control"
                 aria-label={t('Moment in the video')}
                 onChange={(e) => setScrub(Number(e.target.value))}
                 onPointerUp={() => setAt(scrub)}
@@ -1288,7 +1288,7 @@ export default function GamingLayoutEditor({
             <label className="flex items-center gap-2 text-xs text-muted mr-auto cursor-pointer">
               <input
                 type="checkbox"
-                className="size-4 accent-[#38BDF8]"
+                className="size-4 accent-control"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
               />

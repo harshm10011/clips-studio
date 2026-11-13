@@ -293,7 +293,7 @@ export default function Watch({
           <label className="inline-flex items-center gap-2 text-sm shrink-0">
             <input
               type="checkbox"
-              className="size-4 accent-[#38BDF8]"
+              className="size-4 accent-control"
               checked={Boolean(status?.enabled)}
               disabled={busy || status === null}
               onChange={(e) => void act(() => api.setAutomation({ enabled: e.target.checked }))}
@@ -305,7 +305,7 @@ export default function Watch({
         <label className="flex items-start gap-2 text-sm cursor-pointer">
           <input
             type="checkbox"
-            className="size-4 mt-0.5 accent-[#38BDF8]"
+            className="size-4 mt-0.5 accent-control"
             checked={Boolean(status?.delete_sources)}
             disabled={busy || status === null}
             onChange={(e) => void act(() => api.setAutomation({ delete_sources: e.target.checked }))}
@@ -323,7 +323,7 @@ export default function Watch({
           <label className="flex items-start gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
-              className="size-4 mt-0.5 accent-[#38BDF8]"
+              className="size-4 mt-0.5 accent-control"
               checked={tray}
               onChange={(e) => void setKeepInTray(e.target.checked)}
             />
@@ -431,7 +431,7 @@ export default function Watch({
                   <label key={id} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="size-4 accent-[#38BDF8]"
+                      className="size-4 accent-control"
                       checked={platforms.includes(id)}
                       onChange={(e) =>
                         setAddPlatforms(
@@ -477,7 +477,7 @@ export default function Watch({
               >
                 <input
                   type="checkbox"
-                  className="size-4 accent-[#38BDF8]"
+                  className="size-4 accent-control"
                   checked={on}
                   onChange={(e) => {
                     const next = { ...addClip }
@@ -600,7 +600,7 @@ export default function Watch({
                 <label className="flex items-center gap-2 cursor-pointer text-sm">
                   <input
                     type="checkbox"
-                    className="size-4 accent-[#38BDF8]"
+                    className="size-4 accent-control"
                     checked={addOnlyMine}
                     onChange={(e) => setAddOnlyMine(e.target.checked)}
                   />

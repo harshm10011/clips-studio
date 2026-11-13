@@ -1933,7 +1933,7 @@ export default function TimelineEditor({
             max={200}
             value={Math.round(edit.volume * 100)}
             disabled={edit.mute_all}
-            className="w-24 accent-[#38BDF8]"
+            className="w-24 accent-control"
             onChange={(e) => setEdit({ ...edit, volume: Number(e.target.value) / 100 })}
             onMouseUp={() => setHistory((h) => [...h.slice(-30), { edit }])}
           />
@@ -2126,7 +2126,7 @@ export default function TimelineEditor({
                   min={5}
                   max={100}
                   value={Math.round(edit.music.volume * 100)}
-                  className="w-20 accent-[#38BDF8]"
+                  className="w-20 accent-control"
                   onChange={(e) =>
                     setEdit({ ...edit, music: { ...edit.music!, volume: Number(e.target.value) / 100 } })
                   }

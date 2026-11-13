@@ -256,7 +256,7 @@ export default function WatermarkControls({
             max={100}
             value={Math.round((config.opacity ?? 0.85) * 100)}
             onChange={(e) => onChange({ opacity: Number(e.target.value) / 100 })}
-            className="flex-1 accent-[#38BDF8]"
+            className="flex-1 accent-control"
           />
           <span className="tabular-nums w-8">{Math.round((config.opacity ?? 0.85) * 100)}%</span>
         </label>
@@ -269,7 +269,7 @@ export default function WatermarkControls({
               max={45}
               value={Math.round((config.scale ?? 0.18) * 100)}
               onChange={(e) => onChange({ scale: Number(e.target.value) / 100 })}
-              className="flex-1 accent-[#38BDF8]"
+              className="flex-1 accent-control"
             />
             <span className="tabular-nums w-8">{Math.round((config.scale ?? 0.18) * 100)}%</span>
           </label>
@@ -282,7 +282,7 @@ export default function WatermarkControls({
             max={12}
             value={Math.round((config.padding ?? 0.04) * 100)}
             onChange={(e) => onChange({ padding: Number(e.target.value) / 100 })}
-            className="flex-1 accent-[#38BDF8]"
+            className="flex-1 accent-control"
           />
           <span className="tabular-nums w-8">{Math.round((config.padding ?? 0.04) * 100)}%</span>
         </label>

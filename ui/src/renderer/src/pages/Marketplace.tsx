@@ -921,7 +921,7 @@ function CountingNote({ manage }: { manage: boolean }): JSX.Element | null {
       <label className="flex items-start gap-2 cursor-pointer">
         <input
           type="checkbox"
-          className="size-4 mt-0.5 accent-[#38BDF8]"
+          className="size-4 mt-0.5 accent-control"
           checked={state.enabled}
           disabled={!manage || state.locked_off}
           onChange={(e) => toggle(e.target.checked)}
@@ -959,7 +959,7 @@ function OnlineListNote({ manage, online }: { manage: boolean; online: OnlineLis
       <label className="flex items-start gap-2 cursor-pointer">
         <input
           type="checkbox"
-          className="size-4 mt-0.5 accent-[#38BDF8]"
+          className="size-4 mt-0.5 accent-control"
           checked={state.automatic}
           disabled={!manage}
           onChange={(e) => toggle(e.target.checked)}
@@ -1393,7 +1393,7 @@ function ModelRow({
             <label className="flex items-start gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                className="size-4 mt-0.5 accent-[#38BDF8]"
+                className="size-4 mt-0.5 accent-control"
                 checked={pickleOk}
                 onChange={(e) => setPickleOk(e.target.checked)}
               />
@@ -1553,7 +1553,7 @@ function InstalledCard({
         <label className="flex items-center gap-2 text-sm cursor-pointer shrink-0">
           <input
             type="checkbox"
-            className="size-4 accent-[#38BDF8]"
+            className="size-4 accent-control"
             checked={plugin.enabled}
             disabled={busy || !manage || (blocked && !plugin.enabled)}
             onChange={(e) => run(() => plugins.setEnabled(plugin.id, e.target.checked))}
@@ -1941,7 +1941,7 @@ function InstallDialog({
                   <label key={c} className="flex items-start gap-2 text-sm cursor-pointer">
                     <input
                       type="checkbox"
-                      className="size-4 mt-0.5 accent-[#38BDF8]"
+                      className="size-4 mt-0.5 accent-control"
                       checked={Boolean(ticked[c])}
                       onChange={(e) => setTicked((v) => ({ ...v, [c]: e.target.checked }))}
                     />

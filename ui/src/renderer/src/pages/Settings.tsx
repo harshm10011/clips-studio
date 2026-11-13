@@ -365,7 +365,7 @@ function AppearanceCard(): JSX.Element {
           step={12.5}
           value={appearance.scale}
           onChange={(e) => update({ scale: Number(e.target.value) })}
-          className="w-full mt-1 accent-[#38BDF8]"
+          className="w-full mt-1 accent-control"
         />
       </div>
       <div className="flex items-end gap-3">
@@ -554,7 +554,7 @@ function NotificationsCard(): JSX.Element {
       <label className="flex items-center gap-2 cursor-pointer text-sm">
         <input
           type="checkbox"
-          className="size-4 accent-[#38BDF8]"
+          className="size-4 accent-control"
           checked={onFinish}
           onChange={(e) => {
             setOnFinish(e.target.checked)
@@ -566,7 +566,7 @@ function NotificationsCard(): JSX.Element {
       <label className="flex items-center gap-2 cursor-pointer text-sm">
         <input
           type="checkbox"
-          className="size-4 accent-[#38BDF8]"
+          className="size-4 accent-control"
           checked={onEmpty}
           onChange={(e) => {
             setOnEmpty(e.target.checked)

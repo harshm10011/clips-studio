@@ -985,7 +985,7 @@ export default function AddVideos({ onAdded }: { onAdded?: () => void }): JSX.El
               >
                 <input
                   type="checkbox"
-                  className="size-4 accent-[#38BDF8]"
+                  className="size-4 accent-control"
                   checked={slot.options.captions !== false}
                   onChange={(e) =>
                     replaceOptions(slot.key, toggle(slot.options, 'captions', e.target.checked))
@@ -1045,7 +1045,7 @@ export default function AddVideos({ onAdded }: { onAdded?: () => void }): JSX.El
                   >
                     <input
                       type="checkbox"
-                      className="size-4 accent-[#38BDF8]"
+                      className="size-4 accent-control"
                       checked={isOn(slot.options, tg.key)}
                       disabled={disabled}
                       onChange={(e) => {
@@ -1215,7 +1215,7 @@ export default function AddVideos({ onAdded }: { onAdded?: () => void }): JSX.El
                 >
                   <input
                     type="checkbox"
-                    className="size-4 accent-[#38BDF8]"
+                    className="size-4 accent-control"
                     checked={Boolean(slot.options.longform.shorts)}
                     onChange={(e) => setLongformShorts(slot, e.target.checked)}
                   />

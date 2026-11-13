@@ -78,6 +78,21 @@ export default function App(): JSX.Element {
     window.addEventListener('open-models', open)
     return () => window.removeEventListener('open-models', open)
   }, [])
+  // Match the number keys to the left-to-right order of the app sidebar,
+  // as in other Mac desktop apps. Ctrl works as the equivalent on Windows/Linux.
+  useEffect(() => {
+    const pages: Page[] = ['dashboard', 'queue', 'watch', 'studio', 'creators', 'marketplace', 'models', 'settings']
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
+      const index = Number.parseInt(event.key, 10) - 1
+      if (!Number.isInteger(index) || index < 0 || index >= pages.length) return
+      event.preventDefault()
+      const nextPage = pages[index]
+      if (nextPage) setPage(nextPage)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
   // And the Marketplace: the Generate bar's Pipeline switch links here.
   useEffect(() => {
     const open = (): void => setPage('marketplace')
@@ -154,7 +169,7 @@ export default function App(): JSX.Element {
   }
 
   return (
-    <ClipUpdatesProvider><div className="flex h-screen" key={locale}>
+    <ClipUpdatesProvider><div className={`flex h-screen ${window.studio?.platform === 'darwin' ? 'mac-window' : ''}`} key={locale}>
       <ApprovalCards onOpen={videoId => { setStudioTarget({videoId}); setPage('studio') }} />
       <aside className="w-52 shrink-0 bg-surface border-r border-raised/60 flex flex-col">
         {/* Same lockup as the website header: Clippy, then the name and
@@ -181,6 +196,7 @@ export default function App(): JSX.Element {
             <button
               key={item.id}
               onClick={() => setPage(item.id)}
+              aria-current={page === item.id ? 'page' : undefined}
               className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-colors ${
                 page === item.id
                   ? 'bg-accent/15 text-accent font-medium'

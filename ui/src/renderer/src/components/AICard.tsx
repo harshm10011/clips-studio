@@ -315,7 +315,7 @@ function TierRow({
           checked={checked}
           disabled={busy}
           onChange={onSelect}
-          className="mt-1 size-4 accent-[#38BDF8] shrink-0"
+          className="mt-1 size-4 accent-control shrink-0"
         />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2 flex-wrap">

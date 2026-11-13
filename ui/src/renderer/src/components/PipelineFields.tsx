@@ -155,7 +155,7 @@ export default function PipelineFields({
                 {spec.type === 'boolean' ? (
                   <input
                     type="checkbox"
-                    className="size-4 accent-[#38BDF8]"
+                    className="size-4 accent-control"
                     checked={Boolean(v)}
                     onChange={(e) => set(n, spec, e.target.checked)}
                   />

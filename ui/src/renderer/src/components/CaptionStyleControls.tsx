@@ -144,7 +144,7 @@ export default function CaptionStyleControls({
             type="range"
             min={40}
             max={140}
-            className="mt-3 w-full accent-[#38BDF8]"
+            className="mt-3 w-full accent-control"
             value={style.font_size}
             onChange={(e) => onChange('font_size', Number(e.target.value))}
           />
@@ -187,7 +187,7 @@ export default function CaptionStyleControls({
       <label className="flex items-center gap-2 cursor-pointer text-sm">
         <input
           type="checkbox"
-          className="size-4 accent-[#38BDF8]"
+          className="size-4 accent-control"
           checked={style.uppercase}
           onChange={(e) => onChange('uppercase', e.target.checked)}
         />
@@ -198,7 +198,7 @@ export default function CaptionStyleControls({
         <label className="flex items-center gap-2 cursor-pointer text-sm">
           <input
             type="checkbox"
-            className="size-4 accent-[#38BDF8]"
+            className="size-4 accent-control"
             checked={style.highlight}
             onChange={(e) => onChange('highlight', e.target.checked)}
           />
@@ -225,7 +225,7 @@ export default function CaptionStyleControls({
           >
             <input
               type="checkbox"
-              className="size-4 accent-[#38BDF8]"
+              className="size-4 accent-control"
               checked={style.second_speaker}
               onChange={(e) => onChange('second_speaker', e.target.checked)}
             />

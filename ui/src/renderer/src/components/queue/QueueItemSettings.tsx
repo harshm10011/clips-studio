@@ -213,7 +213,7 @@ export default function QueueItemSettings({
     <label className="flex items-center gap-2 cursor-pointer text-sm" title={title}>
       <input
         type="checkbox"
-        className="size-4 accent-[#38BDF8]"
+        className="size-4 accent-control"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
@@ -467,7 +467,7 @@ export default function QueueItemSettings({
           >
             <input
               type="checkbox"
-              className="size-4 accent-[#38BDF8]"
+              className="size-4 accent-control"
               checked={longformShorts}
               onChange={(e) => setLongformShorts(e.target.checked)}
             />

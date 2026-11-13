@@ -107,7 +107,7 @@ export default function SportFields({
         <label key={reel.id} className="flex items-center gap-1.5 text-sm cursor-pointer shrink-0" title={t(reel.title)}>
           <input
             type="checkbox"
-            className="size-4 accent-[#38BDF8]"
+            className="size-4 accent-control"
             aria-label={`${t(reel.label)}${suffix}`}
             checked={(value.reels ?? []).includes(reel.id)}
             onChange={(e) => {

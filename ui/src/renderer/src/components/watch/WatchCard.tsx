@@ -177,7 +177,7 @@ export default function WatchCard({
           <label className="inline-flex items-center gap-2 text-sm" title={t('Watch this channel')}>
             <input
               type="checkbox"
-              className="size-4 accent-[#38BDF8]"
+              className="size-4 accent-control"
               checked={watch.enabled}
               disabled={busy}
               onChange={(e) => void act(() => api.patchWatch(watch.id, { enabled: e.target.checked }))}

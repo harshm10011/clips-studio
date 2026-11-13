@@ -69,7 +69,7 @@ export default function RemoteRenderCard(): JSX.Element {
       <label className="flex items-start gap-3 cursor-pointer">
         <input
           type="checkbox"
-          className="size-4 mt-0.5 accent-[#38BDF8]"
+          className="size-4 mt-0.5 accent-control"
           checked={s.enabled}
           disabled={busy}
           onChange={(e) => void run(() => api.setRemoteRender({ enabled: e.target.checked }))}
@@ -214,7 +214,7 @@ export default function RemoteRenderCard(): JSX.Element {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="size-4 accent-[#38BDF8]"
+                    className="size-4 accent-control"
                     checked={tp.enabled}
                     disabled={busy}
                     onChange={(e) => void run(() => api.setThisPcWorker({ enabled: e.target.checked }))}
@@ -224,7 +224,7 @@ export default function RemoteRenderCard(): JSX.Element {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="size-4 accent-[#38BDF8]"
+                    className="size-4 accent-control"
                     checked={tp.draining}
                     disabled={busy || !tp.enabled}
                     onChange={(e) => void run(() => api.setThisPcWorker({ draining: e.target.checked }))}
@@ -284,7 +284,7 @@ function RenderOn({
           <input
             type="radio"
             name="render-on"
-            className="mt-1 accent-[#38BDF8]"
+            className="mt-1 accent-control"
             checked={mode === value}
             disabled={disabled}
             onChange={() => onPick(value)}

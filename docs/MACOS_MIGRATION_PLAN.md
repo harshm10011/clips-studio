@@ -54,6 +54,16 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - The default duration configuration is 10–60 seconds, with sentence fitting growing short picks toward a watchable length; the existing 60s+ option selects 61–180 seconds. Specific clips can use the existing long-form modes.
 - This environment lacks pytest, FastAPI, and UI dependencies, so no packaged end-to-end sample-video run is claimed. M4 throughput and real source/video tests remain release validation.
 
+## Prompt phase 05 — Professional macOS UI/UX
+
+**Status: first Mac-first visual and interaction pass implemented; packaged UI review remains pending.**
+
+- The existing Dashboard, creator and video libraries, import flow, live Processing Queue, AI/model controls, generated clips, clip and subtitle editors, export settings, diagnostics, and Settings remain connected to the real API and WebSocket job events.
+- Replaced the blue-navy palette with shared graphite and violet tokens and moved system controls to the same accent token. The font stack now uses the native Apple system font where available.
+- macOS uses the native inset traffic lights with a reserved title-bar gutter. The other desktop platforms retain their standard title bar.
+- Added Command+1–8 navigation on macOS (Control+1–8 on Windows/Linux) in sidebar order, with the active destination exposed to assistive technology.
+- UI dependencies are not installed here, so the packaged M4 visual review and build are still pending.
+
 ## Milestone 03 — Native macOS process and package
 
 - Build the Python 3.11 backend for ARM64 with PyInstaller on macOS.

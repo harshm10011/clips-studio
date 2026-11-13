@@ -97,7 +97,7 @@ export default function CaptionEditor({
           <label className="flex items-center gap-2 cursor-pointer text-sm">
             <input
               type="checkbox"
-              className="size-4 accent-[#38BDF8]"
+              className="size-4 accent-control"
               checked={burn}
               onChange={(e) => {
                 setBurn(e.target.checked)
