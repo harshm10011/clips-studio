@@ -22,7 +22,7 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - Added `core/macos` hardware, acceleration, memory-profile, and local Ollama diagnostics, plus `scripts/diagnose_macos.py`.
 - PyTorch device selection now prefers MPS, validates YOLO accelerators with a small real inference, and retries on CPU when a model cannot run. Local transcription, Ollama and vision inference share one heavy AI slot.
 - A 16 GB profile recommends the repository's tested `gemma3:4b` and limits one heavy AI job at a time. The recommendation does not overwrite the user's model setting.
-- Local Whisper weights are dropped after transcription. On machines at or below 24 GB, a locally hosted Ollama model is asked to unload after each completed video; remote Ollama hosts are never sent unload requests. Unused PyTorch cache is also cleared at the job boundary.
+- Local Whisper weights are dropped after transcription. A local Ollama model stays warm across queued videos while available memory is healthy and unloads after a run when estimated headroom is tight; remote Ollama hosts are never sent unload requests. Unused PyTorch cache is also cleared at the job boundary.
 - FFmpeg is queried for VideoToolbox encoders. Whisper stays on CPU on MPS because the current faster-whisper/CTranslate2 backend has no MPS or Core ML path.
 - Core ML is detected as a macOS system runtime. Python conversion tools and WhisperKit are reported separately; neither is installed in this environment, so no Core ML transcription path is claimed.
 - Hardware report and pure-Python profile tests pass. No M4 inference benchmark has run yet because Ollama and an MPS-enabled PyTorch build are absent.
@@ -72,7 +72,18 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - Added a per-clip 1:1 square format. It renders at 1080×1080 with a centered crop; the editor labels that choice and keeps the preview, watermark, captions, and final render on the square canvas. Choose Vertical to use the existing AI speaker-tracking crop.
 - Added caption templates plus controls for outline colour/width and a background box with colour/opacity. Added common macOS fonts and automatic macOS script-font choices for supported languages.
 - Added H.265 MP4 export and selectable 4, 8, or 12 Mb/s encoding. macOS tries VideoToolbox first, then FFmpeg's libx265; default H.264 export still copies the already-rendered file.
-- UI dependencies are absent here, and no M4 sample render or hardware encoder run has been performed. H.265 availability depends on the FFmpeg build; the export path reports an error if neither the hardware nor software encoder is available.
+- UI dependencies are absent here, so no M4 sample render has been reviewed. A later synthetic Phase 7 benchmark confirmed H.264 VideoToolbox encoding; H.265 hardware encoding still depends on the FFmpeg build and has not been exercised end to end.
+
+## Prompt phase 07 — Batch processing and performance
+
+**Status: durable batch workflow audited; macOS render limits, signal caching, and a VideoToolbox benchmark are implemented.**
+
+- The existing SQLite queue stages multiple videos, enforces a five-job active cap, prevents duplicate queued/running videos, stores each job's settings, supports ordering, pause, cancellation, retry, and restart recovery, and reports per-job progress plus an overall time estimate.
+- A single pipeline worker processes one video at a time. Interrupted jobs return to the queue, while completed downloads and transcripts are reused. Completed audio and visual feature arrays now have a versioned cache keyed by video ID and source path/size/mtime; stale entries are rebuilt, writes are atomic, and orphan entries are reclaimable in Storage cleanup.
+- The local Ollama model remains warm between queued videos while memory headroom is normal, avoiding repeated model startup. It unloads after a run when available-memory estimates indicate tight or critical headroom.
+- Apple Silicon rendering is capped at one clip render worker to preserve unified-memory headroom. Dashboard memory stats now show available memory and an estimated pressure band; the estimate uses available-memory thresholds and is not Apple's private pressure metric. Queue pause still lets the active video finish; the estimate does not forcibly interrupt an active job.
+- Run `python scripts/benchmark_macos.py` for a synthetic VideoToolbox matrix at 720p and 1080p, with 5- and 15-second cases. Pass `--resolutions 720p,1080p,4k --lengths 5,15,30` for a larger matrix. The report measures encoder throughput and FFmpeg process RSS, not model inference or the full pipeline.
+- The current environment is an M4 MacBook Air with 16 GB RAM and FFmpeg VideoToolbox H.264/H.265 encoders. A 720p synthetic 5/15-second run encoded at 235/363 fps (7.83×/12.11× real time); 1080p encoded at 161/206 fps (5.36×/6.88×). Peak FFmpeg process RSS was about 76/76 MB at 720p and 122 MB at 1080p. Synthetic patterns are easier to encode than real footage; representative creator media and full AI throughput still need separate measurement.
 
 ## Milestone 03 — Native macOS process and package
 
@@ -104,8 +115,7 @@ After this works reliably, polish the Mac-first onboarding, model manager, setti
 
 ## Current blockers
 
-- The public fork `harshm10011/clips-studio` and its `macos/m4-support` branch are created. The local Git metadata is outside the workspace because this managed checkout does not permit `.git` writes.
-- GitHub CLI is absent; `origin` and `upstream` are configured in the local Git checkout.
-- Python 3.11, pytest, most project Python dependencies, UI `node_modules`, Ollama, `coremltools`, and WhisperKit are not installed. Python 3.14.2 is present and cannot be used for the promised frozen runtime build.
-- This environment's PyTorch reports MPS unavailable. The MPS path has mocked coverage, but real Apple inference and end-to-end rendering still need an MPS-enabled dependency build.
+- The public fork `harshm10011/clips-studio` and `macos/m4-support` branch are created, and milestone pushes are working. The Git metadata lives at `/private/tmp/clipforge-source/.git` for this managed checkout.
+- Python 3.14.2, Node 24.11.1, and npm 11.6.2 are present. Python 3.11, pytest, FastAPI, faster-whisper, yt-dlp, coremltools, Ollama, and UI `node_modules` are absent; NumPy, OpenCV, PyTorch, and psutil are available. Python 3.14 cannot be used for the planned frozen Python 3.11 runtime build.
+- The installed PyTorch build reports MPS unavailable. Hardware encoding was measured through VideoToolbox, but real Apple AI inference, transcription, and an end-to-end sample render still need the matching runtime dependencies.
 - The macOS package and production rendering pipeline have not been built or exercised yet.

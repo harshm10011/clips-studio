@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from core.macos.acceleration import mps_usable, run_with_device_fallback
-from core.macos.memory import ai_inference_slot, profile_for_memory
+from core.macos.memory import ai_inference_slot, estimate_memory_pressure, profile_for_memory
 from core.macos.models import model_recommendation, release_model_for_memory_profile
 from transcription import transcriber
 
@@ -44,6 +44,12 @@ class MacOSEngineTests(unittest.TestCase):
         self.assertEqual(profile_for_memory(8_000_000_000).tier, "low")
         self.assertEqual(profile_for_memory(32_000_000_000).recommendation, "gemma3:12b")
 
+    def test_memory_pressure_estimate_tracks_available_headroom(self):
+        self.assertEqual(estimate_memory_pressure(16_000_000_000, 8_000_000_000), "normal")
+        self.assertEqual(estimate_memory_pressure(16_000_000_000, 2_500_000_000), "tight")
+        self.assertEqual(estimate_memory_pressure(16_000_000_000, 900_000_000), "critical")
+        self.assertEqual(estimate_memory_pressure(None, None), "unknown")
+
     def test_memory_model_advice_does_not_write_settings(self):
         report = model_recommendation({
             "total_bytes": 16_000_000_000,
@@ -76,6 +82,19 @@ class MacOSEngineTests(unittest.TestCase):
                 "gemma3:4b", "http://localhost:11434", 32 * 1024**3
             ))
             unload.assert_not_called()
+
+    def test_memory_profile_keeps_local_model_warm_when_headroom_is_healthy(self):
+        with patch("core.macos.models.unload_ollama_model") as unload:
+            self.assertFalse(release_model_for_memory_profile(
+                "gemma3:4b", "http://localhost:11434", 16 * 1024**3, 8 * 1024**3
+            ))
+            unload.assert_not_called()
+
+        with patch("core.macos.models.unload_ollama_model", return_value=True) as unload:
+            self.assertTrue(release_model_for_memory_profile(
+                "gemma3:4b", "http://localhost:11434", 16 * 1024**3, 2 * 1024**3
+            ))
+            unload.assert_called_once_with("gemma3:4b", "http://localhost:11434")
 
     def test_accelerator_inference_failure_retries_on_cpu(self):
         class Model:

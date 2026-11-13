@@ -63,6 +63,10 @@ def survey(db, data_dir: Path) -> dict:
         groups["orphan_transcripts"] = [
             f for f in transcripts.glob("*.json") if f.stem not in known_videos
         ]
+        groups["orphan_transcripts"] += [
+            f for f in transcripts.glob("*.signals.npz")
+            if f.name.removesuffix(".signals.npz") not in known_videos
+        ]
 
     # A video's voices (analysis/voice_turns.py), a few KB kept beside its
     # transcript and counted with it.

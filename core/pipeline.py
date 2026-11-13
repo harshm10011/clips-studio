@@ -10,6 +10,7 @@ reprocessed, and the clips table's UNIQUE constraint blocks duplicates.
 import json
 import math
 import re
+import sys
 import threading
 from pathlib import Path
 
@@ -198,8 +199,10 @@ def _release_local_model_for_memory(config: dict, llm) -> None:
         from core.macos.models import release_model_for_memory_profile
 
         host = str((config.get("llm") or {}).get("ollama_host") or "http://localhost:11434")
-        total_bytes = memory_snapshot().total_bytes
-        released = release_model_for_memory_profile(model_name.split("/", 1)[1], host, total_bytes)
+        memory = memory_snapshot()
+        released = release_model_for_memory_profile(
+            model_name.split("/", 1)[1], host, memory.total_bytes, memory.available_bytes
+        )
         if released:
             print("      Released the local language model to free memory for the next video")
     except Exception as exc:
@@ -400,8 +403,15 @@ def process_video(url: str, config: dict, db: StateDB, force: bool = False) -> l
             from analysis.audio_features import extract_audio_features
             from analysis.visual_features import extract_visual_features
 
-            audio_raw = extract_audio_features(video.path)
-            visual_raw = extract_visual_features(video.path)
+            from analysis.signal_cache import load_or_extract
+
+            audio_raw, visual_raw = load_or_extract(
+                video.path,
+                video.video_id,
+                data_dir / "transcripts",
+                extract_audio_features,
+                extract_visual_features,
+            )
             signals_out["signals"] = (audio_raw, visual_raw)
         except cancel.CancelledError:
             return  # the video was cancelled: its decode stopped with it
@@ -724,7 +734,13 @@ def process_video(url: str, config: dict, db: StateDB, force: bool = False) -> l
     # on this thread — sqlite connections are not shareable across threads.
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    workers = max(1, int(config.get("video", {}).get("parallel_renders", 2)))
+    configured_workers = max(1, int(config.get("video", {}).get("parallel_renders", 2)))
+    # On Apple Silicon, local tracking, encoding and the rest of macOS share
+    # unified memory. Keep the M4 profile to one active clip render even when
+    # a config copied from a Windows workstation asks for more.
+    workers = 1 if sys.platform == "darwin" else configured_workers
+    if workers < configured_workers:
+        print(f"      macOS memory profile: limiting clip renders to {workers} worker")
     if modes.needs_framing(config):
         # Only the tracked render pipes frames through OpenCV/torch; a
         # Vertical Live render is FFmpeg alone and needs neither loaded.

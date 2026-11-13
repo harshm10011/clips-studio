@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
-from core.macos.memory import memory_snapshot, profile_for_memory
+from core.macos.memory import estimate_memory_pressure, memory_snapshot, profile_for_memory
 
 
 def find_ollama_binary() -> str | None:
@@ -84,18 +84,26 @@ def unload_ollama_model(model: str, host: str = "http://127.0.0.1:11434", timeou
         return False
 
 
-def release_model_for_memory_profile(model: str, host: str, total_bytes: int | None) -> bool:
-    """Unload a local model after a finished video on unified-memory systems.
+def release_model_for_memory_profile(
+    model: str,
+    host: str,
+    total_bytes: int | None,
+    available_bytes: int | None = None,
+) -> bool:
+    """Unload a local model after a finished video when headroom is tight.
 
-    A 16 GB Mac processes the transcript before asking Ollama for clip analysis.
-    Releasing Ollama after that video prevents its resident model from competing
-    with transcription on the next queued video. Larger-memory machines keep
-    the model warm for throughput. Non-loopback hosts are never unloaded.
+    Keep Ollama warm between queued videos while memory headroom is healthy,
+    avoiding a large model reload for each item. On smaller Macs, unload after
+    a run when the available-memory estimate is tight or critical. When that
+    estimate is unavailable, retain the conservative legacy unload behavior.
+    Non-loopback hosts are never unloaded.
     """
     hostname = (urlparse(host).hostname or "").lower()
     if hostname not in {"localhost", "127.0.0.1", "::1"}:
         return False
     if not total_bytes or total_bytes > 24_000_000_000:
+        return False
+    if available_bytes is not None and estimate_memory_pressure(total_bytes, available_bytes) == "normal":
         return False
     return unload_ollama_model(model, host)
 

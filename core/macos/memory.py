@@ -98,6 +98,21 @@ def profile_for_memory(total_bytes: int | None, available_bytes: int | None = No
     )
 
 
+def estimate_memory_pressure(total_bytes: int | None, available_bytes: int | None) -> str:
+    """Estimate memory pressure from available RAM without claiming Apple's
+    private pressure score. The UI pairs this heads-up with available bytes.
+    """
+    if not total_bytes or total_bytes <= 0 or available_bytes is None:
+        return "unknown"
+    available = max(0, int(available_bytes))
+    fraction = available / total_bytes
+    if available < 1_500_000_000 or fraction < 0.10:
+        return "critical"
+    if available < 3_000_000_000 or fraction < 0.20:
+        return "tight"
+    return "normal"
+
+
 @contextmanager
 def ai_inference_slot(name: str = "local AI") -> Iterator[None]:
     """Serialize heavyweight local inference to protect unified-memory headroom."""

@@ -778,6 +778,8 @@ export interface GpuStats {
 export interface SystemStats {
   cpu_percent: number
   ram_percent: number
+  memory_available_bytes?: number
+  memory_pressure?: 'normal' | 'tight' | 'critical' | 'unknown'
   data_dir_bytes: number
   disk_free_bytes: number
   gpu: GpuStats | null

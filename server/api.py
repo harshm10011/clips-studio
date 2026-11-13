@@ -935,9 +935,14 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
         import psutil
 
         disk = shutil.disk_usage(data_dir)
+        memory = psutil.virtual_memory()
+        from core.macos.memory import estimate_memory_pressure
+
         stats = {
             "cpu_percent": psutil.cpu_percent(interval=0.1),
-            "ram_percent": psutil.virtual_memory().percent,
+            "ram_percent": memory.percent,
+            "memory_available_bytes": int(memory.available),
+            "memory_pressure": estimate_memory_pressure(memory.total, memory.available),
             "data_dir_bytes": sum(f.stat().st_size for f in data_dir.rglob("*") if f.is_file()),
             "disk_free_bytes": disk.free,
             "gpu": _gpu_stats(),
@@ -1504,7 +1509,10 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
                 p for p in downloads.iterdir()
                 if p.is_file() and p.name.startswith(f"{vid}.")
             ) if downloads.is_dir() else 0
-            transcript = total([transcripts / f"{vid}.json"])
+            transcript = total([
+                transcripts / f"{vid}.json",
+                transcripts / f"{vid}.signals.npz",
+            ])
             clip_bytes = 0
             if clips_root.is_dir():
                 for creator in clips_root.iterdir():
@@ -1583,7 +1591,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
         transcripts = data_dir / "transcripts"
         if transcripts.is_dir():
             for f in transcripts.iterdir():
-                if f.is_file() and f.name == f"{video_id}.json":
+                if f.is_file() and f.name in (f"{video_id}.json", f"{video_id}.signals.npz"):
                     _unlink_best_effort(f, data_dir)
 
         # Whose voice is whose in it (analysis/voice_turns.py).

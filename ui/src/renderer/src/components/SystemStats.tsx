@@ -24,6 +24,13 @@ function Inline({ label, value }: { label: string; value: string }): JSX.Element
   )
 }
 
+function pressureLabel(value: Stats['memory_pressure']): string {
+  if (value === 'critical') return 'Critical'
+  if (value === 'tight') return 'Tight'
+  if (value === 'normal') return 'Normal'
+  return 'Unknown'
+}
+
 export default function SystemStats({ compact = false }: { compact?: boolean }): JSX.Element {
   const [stats, setStats] = useState<Stats | null>(null)
 
@@ -57,7 +64,10 @@ export default function SystemStats({ compact = false }: { compact?: boolean }):
     return (
       <div className="flex gap-4 items-center text-sm flex-wrap">
         <Inline label="CPU" value={`${Math.round(stats.cpu_percent)}%`} />
-        <Inline label="RAM" value={`${Math.round(stats.ram_percent)}%`} />
+        <Inline
+          label="Memory (estimate)"
+          value={`${Math.round(stats.ram_percent)}% · ${pressureLabel(stats.memory_pressure)}`}
+        />
         <Inline
           label="GPU"
           value={
@@ -74,7 +84,11 @@ export default function SystemStats({ compact = false }: { compact?: boolean }):
   return (
     <div className="flex gap-3 flex-wrap">
       <Widget label="CPU" value={`${Math.round(stats.cpu_percent)}%`} />
-      <Widget label="RAM" value={`${Math.round(stats.ram_percent)}%`} />
+      <Widget
+        label="Memory pressure (estimate)"
+        value={`${Math.round(stats.ram_percent)}% · ${pressureLabel(stats.memory_pressure)}`}
+        sub={stats.memory_available_bytes == null ? 'Available memory estimate' : `${gb(stats.memory_available_bytes)} available`}
+      />
       {stats.gpu ? (
         <Widget
           label="GPU"
