@@ -4,8 +4,8 @@ The source already contains most product features. The macOS project should pres
 
 | Feature area | Existing source capability | macOS port status / first parity target |
 |---|---|---|
-| Sources | YouTube, Twitch, Kick, and local video workflows | Preserve supported authorized sources; keep local import as fallback when access is unavailable. |
-| Creators and projects | Creator profiles, creator knowledge, project/job state, and processing history | Keep the Python API and SQLite data model; use a stable macOS Application Support directory. |
+| Sources | YouTube, Twitch, Kick, and local video workflows | Existing platform adapters resolve public channel URLs/handles; watched-channel discovery and local import remain available when a source cannot be accessed. |
+| Creators and projects | Creator profiles, creator knowledge, project/job state, and processing history | Profiles can be created directly from the Creators screen with a public channel reference; video and clip libraries remain linked by creator identity. Use a stable macOS Application Support directory. |
 | Transcription and analysis | Faster-Whisper, multimodal signals, LLM scoring, clip candidates, titles, descriptions, and hashtags | Run locally first with CPU fallback; benchmark M4 acceleration before enabling it. |
 | Clip rendering | FFmpeg editing, 9:16 crop, speaker tracking, caption burn-in, and VideoToolbox probing | Bundle ARM64 FFmpeg; validate production filters and retain CPU/software encoder fallback. |
 | Editing and export | Clip editor, trims/cuts, audio controls, captions, overlays, and MP4 export | Preserve existing UI and API; verify file dialogs, paths, and exported media on macOS. |

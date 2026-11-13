@@ -28,6 +28,17 @@ def normalize(name: str) -> str:
     return re.sub(r"[^a-z]", "", (name or "").lower())
 
 
+def find_account(db: StateDB, platform: str, channel: str):
+    """Find an account by its canonical ID or its readable channel name."""
+    return db.conn.execute(
+        "SELECT account_id, creator_id FROM platform_accounts"
+        " WHERE platform = ? AND (platform_account_id = ? COLLATE NOCASE"
+        " OR username = ? COLLATE NOCASE)"
+        " ORDER BY platform_account_id = ? DESC, username = ? DESC LIMIT 1",
+        (platform, channel, channel, channel, channel),
+    ).fetchone()
+
+
 def resolve(
     db: StateDB, video_id: str, channel_name: str, platform: str | None = None
 ) -> int | None:
@@ -43,12 +54,7 @@ def resolve(
     # Case does not make a different channel: Twitch and Kick logins ignore
     # it, and a watched channel typed as "somestreamer" must find the profile
     # its downloads call "SomeStreamer". An exact match still wins.
-    row = db.conn.execute(
-        "SELECT creator_id FROM platform_accounts"
-        " WHERE platform = ? AND platform_account_id = ? COLLATE NOCASE"
-        " ORDER BY platform_account_id = ? DESC LIMIT 1",
-        (platform, channel, channel),
-    ).fetchone()
+    row = find_account(db, platform, channel)
     if row:
         return row["creator_id"]
 
@@ -103,7 +109,8 @@ def suggestions(db: StateDB) -> list[dict]:
     """Possible same-person profiles (similar normalized names on DIFFERENT
     platforms). Suggestions only — merging is the user's call."""
     accounts = db.conn.execute(
-        "SELECT a.creator_id, a.platform, a.platform_account_id, c.display_name"
+        "SELECT a.creator_id, a.platform,"
+        " COALESCE(NULLIF(a.username, ''), a.platform_account_id) AS username, c.display_name"
         " FROM platform_accounts a JOIN creators c ON c.creator_id = a.creator_id"
     ).fetchall()
     out, seen = [], set()
@@ -111,7 +118,7 @@ def suggestions(db: StateDB) -> list[dict]:
         for b in accounts[i + 1 :]:
             if a["creator_id"] == b["creator_id"]:
                 continue
-            na, nb = normalize(a["platform_account_id"]), normalize(b["platform_account_id"])
+            na, nb = normalize(a["username"]), normalize(b["username"])
             if not na or not nb:
                 continue
             # Same normalized name, or one contains the other ('streamername'
@@ -125,7 +132,7 @@ def suggestions(db: StateDB) -> list[dict]:
                     {
                         "creator_a": {"id": a["creator_id"], "name": a["display_name"], "platform": a["platform"]},
                         "creator_b": {"id": b["creator_id"], "name": b["display_name"], "platform": b["platform"]},
-                        "reason": f"similar usernames: {a['platform_account_id']!r} / {b['platform_account_id']!r}",
+                        "reason": f"similar usernames: {a['username']!r} / {b['username']!r}",
                     }
                 )
     return out
@@ -178,11 +185,7 @@ def add_account(db: StateDB, creator_id: int, platform: str, channel: str) -> in
     ).fetchone() is None:
         raise ValueError("unknown creator id")
 
-    existing = db.conn.execute(
-        "SELECT account_id, creator_id FROM platform_accounts"
-        " WHERE platform = ? AND platform_account_id = ?",
-        (platform, channel),
-    ).fetchone()
+    existing = find_account(db, platform, channel)
     if existing:
         old_creator = existing["creator_id"]
         if old_creator != creator_id:
@@ -223,6 +226,58 @@ def add_account(db: StateDB, creator_id: int, platform: str, channel: str) -> in
     )
     db.conn.commit()
     return cur.lastrowid
+
+
+def create_profile(
+    db: StateDB,
+    display_name: str,
+    platform: str,
+    channel: str,
+    platform_account_id: str | None = None,
+) -> tuple[int, int]:
+    """Create a named creator profile with its first resolved platform account.
+
+    Unlike ``add_account``, this never moves an account from an existing
+    profile. A channel belongs to one profile at a time, so duplicate
+    creation is reported for the caller to resolve deliberately.
+    """
+    display_name = (display_name or "").strip()
+    channel = (channel or "").strip()
+    platform = (platform or "").strip().lower()
+    if not display_name:
+        raise ValueError("creator name is required")
+    if platform not in ("youtube", "twitch", "kick"):
+        raise ValueError(f"unknown platform {platform!r}")
+    if not channel:
+        raise ValueError("channel name is required")
+    account_id = (platform_account_id or channel).strip()
+    if not account_id:
+        raise ValueError("channel ID is required")
+
+    existing = db.conn.execute(
+        "SELECT c.display_name FROM platform_accounts a"
+        " JOIN creators c ON c.creator_id = a.creator_id"
+        " WHERE a.platform = ? AND (a.platform_account_id = ? COLLATE NOCASE"
+        " OR a.username = ? COLLATE NOCASE)",
+        (platform, account_id, channel),
+    ).fetchone()
+    if existing:
+        raise ValueError(f"That channel already belongs to {existing['display_name']}.")
+
+    aliases = sorted({display_name, channel})
+    cur = db.conn.execute(
+        "INSERT INTO creators (display_name, aliases, created_at) VALUES (?, ?, ?)",
+        (display_name, json.dumps(aliases), _now()),
+    )
+    creator_id = cur.lastrowid
+    account = db.conn.execute(
+        "INSERT INTO platform_accounts"
+        " (creator_id, platform, platform_account_id, username, display_name)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (creator_id, platform, account_id, channel, channel),
+    )
+    db.conn.commit()
+    return creator_id, account.lastrowid
 
 
 def split_account(db: StateDB, account_id: int) -> int:

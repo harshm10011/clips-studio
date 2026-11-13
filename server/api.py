@@ -181,6 +181,12 @@ class AccountIn(BaseModel):
     channel: str    # channel/username on that platform
 
 
+class CreatorCreateIn(BaseModel):
+    display_name: str
+    platform: str
+    channel: str    # public channel URL, handle, or platform ID
+
+
 class PreviewIn(BaseModel):
     edit: dict | None = None            # pending edit list from the editor
     caption_lines: list[dict] | None = None  # pending caption text, if changed
@@ -2632,6 +2638,33 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
             ],
             "suggestions": sugg,
         }
+
+    @app.post("/creators", status_code=201)
+    def create_creator(body: CreatorCreateIn):
+        """Create a named profile from a channel resolved by its platform adapter."""
+        from sources import channel_feed
+        from creator.identity import create_profile
+
+        display_name = body.display_name.strip()
+        if not display_name:
+            raise HTTPException(400, "creator name is required")
+        try:
+            channel = channel_feed.resolve(body.platform, body.channel)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+
+        d = db()
+        try:
+            creator_id, account_id = create_profile(
+                d, display_name, channel.platform, channel.name, channel.channel_key
+            )
+        except ValueError as e:
+            message = str(e)
+            status = 409 if "already belongs to" in message else 400
+            raise HTTPException(status, message) from e
+        finally:
+            d.close()
+        return {"creator_id": creator_id, "account_id": account_id}
 
     @app.get("/creators/{creator_id}")
     def creator_detail(creator_id: int):

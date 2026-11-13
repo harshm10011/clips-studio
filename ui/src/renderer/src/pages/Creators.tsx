@@ -76,6 +76,9 @@ export default function Creators({
   const [detail, setDetail] = useState<CreatorDetail | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [newName, setNewName] = useState('')
+  const [newPlatform, setNewPlatform] = useState('youtube')
+  const [newChannel, setNewChannel] = useState('')
   const [addPlatform, setAddPlatform] = useState('youtube')
   const [addChannel, setAddChannel] = useState('')
   const [brandingProfiles, setBrandingProfiles] = useState<BrandingProfile[]>([])
@@ -193,9 +196,69 @@ export default function Creators({
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="lg:col-span-2 space-y-2">
+          <form
+            className="bg-surface border border-raised/60 rounded-xl p-3 space-y-2.5 mb-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!newName.trim() || !newChannel.trim()) return
+              void act(async () => {
+                const created = await api.createCreator(
+                  newName.trim(),
+                  newPlatform,
+                  newChannel.trim()
+                )
+                setNewName('')
+                setNewChannel('')
+                setSelected(created.creator_id)
+              })
+            }}
+          >
+            <h3 className="text-sm font-semibold">Add creator</h3>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder={t('Creator display name')}
+              aria-label={t('Creator display name')}
+              className="w-full bg-base border border-raised rounded-lg px-3 py-2 text-sm"
+              maxLength={120}
+            />
+            <div className="flex gap-2">
+              <select
+                value={newPlatform}
+                onChange={(e) => setNewPlatform(e.target.value)}
+                aria-label={t('Platform of the channel to add')}
+                className="bg-base border border-raised rounded-lg px-2 py-2 text-xs"
+              >
+                <option value="youtube">YouTube</option>
+                <option value="twitch">Twitch</option>
+                <option value="kick">Kick</option>
+              </select>
+              <input
+                value={newChannel}
+                onChange={(e) => setNewChannel(e.target.value)}
+                placeholder={t('Public channel URL, handle, or ID')}
+                aria-label={t('Public channel URL, handle, or ID')}
+                className="min-w-0 flex-1 bg-base border border-raised rounded-lg px-3 py-2 text-xs"
+              />
+            </div>
+            <p className="text-[11px] text-muted">
+              {t(
+                'Public channels only. If a source is unavailable, use Add Videos to import a local file.'
+              )}
+            </p>
+            <button
+              type="submit"
+              disabled={busy || !newName.trim() || !newChannel.trim()}
+              className="w-full px-3 py-2 rounded-lg bg-accent/15 text-accent text-xs font-medium hover:bg-accent/25 disabled:opacity-50"
+            >
+              {t('Create creator profile')}
+            </button>
+          </form>
           {creators.length === 0 && (
             <p className="text-sm text-muted">
-              No creators yet — process a video and its channel will appear here automatically.
+              {t(
+                'Profiles also appear automatically when you watch a channel or process one of its videos.'
+              )}
             </p>
           )}
           {creators.map((c) => (

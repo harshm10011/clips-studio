@@ -33,6 +33,16 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - Enable MPS only for model paths that pass real inference checks; use CPU fallback and show the reason when it cannot run.
 - Avoid downloading or loading multiple large models at once; release model resources after each job.
 
+## Prompt phase 03 — Multi-creator source manager
+
+**Status: existing source workflows audited; direct creator setup added.**
+
+- The app already has YouTube, Twitch, and Kick source adapters, watched-channel discovery, local file import, a deduplicating processing queue, job history, and creator video/clip libraries.
+- The Creators screen can now create a named profile from a public channel URL, handle, or platform ID. It uses the existing platform resolver and refuses to silently take a channel that belongs to another profile.
+- Watched-channel setup remains the workflow for ongoing discovery. A profile created here is a library identity; it does not start polling or processing on its own.
+- Source access is limited to what each platform adapter can read. Private, removed, unavailable, or unsupported sources keep their source error; local file import remains available as a fallback. No DRM or access-control bypass is added.
+- The profile setup API and UI are implemented, but macOS runtime behavior and full source-access coverage still need validation on the packaged app.
+
 ## Milestone 03 — Native macOS process and package
 
 - Build the Python 3.11 backend for ARM64 with PyInstaller on macOS.

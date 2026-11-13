@@ -435,12 +435,11 @@ def watch_creator(d: StateDB, watch, *, create: bool = False) -> int | None:
         from creator import identity
 
         return identity.resolve(d, "", name, platform="twitch" if watch["platform"] == "twitch_clips" else watch["platform"])
-    row = d.conn.execute(
-        "SELECT creator_id FROM platform_accounts"
-        " WHERE platform = ? AND platform_account_id = ? COLLATE NOCASE"
-        " ORDER BY platform_account_id = ? DESC LIMIT 1",
-        ("twitch" if watch["platform"] == "twitch_clips" else watch["platform"], name, name),
-    ).fetchone()
+    from creator.identity import find_account
+
+    row = find_account(
+        d, "twitch" if watch["platform"] == "twitch_clips" else watch["platform"], name
+    )
     return row["creator_id"] if row else None
 
 

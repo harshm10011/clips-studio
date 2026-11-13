@@ -549,6 +549,11 @@ export const api = {
 
   creators: () =>
     request<{ creators: CreatorSummary[]; suggestions: CreatorSuggestion[] }>('/creators'),
+  createCreator: (displayName: string, platform: string, channel: string) =>
+    request<{ creator_id: number; account_id: number }>('/creators', {
+      method: 'POST',
+      body: JSON.stringify({ display_name: displayName, platform, channel })
+    }),
   creatorDetail: (id: number) => request<CreatorDetail>(`/creators/${id}`),
   mergeCreators: (fromId: number, intoId: number) =>
     request<{ merged: number; into: number }>('/creators/merge', {

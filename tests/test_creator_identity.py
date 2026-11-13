@@ -5,7 +5,61 @@ and its downloads reporting "SomeStreamer" were two profiles, so what one
 learned the other never saw.
 """
 
+import json
+
 from creator import identity
+
+
+def test_create_profile_saves_a_named_profile_and_platform_account(db):
+    creator_id, account_id = identity.create_profile(
+        db, "A Creator", "youtube", "UC123"
+    )
+
+    creator = db.conn.execute(
+        "SELECT display_name, aliases FROM creators WHERE creator_id = ?", (creator_id,)
+    ).fetchone()
+    account = db.conn.execute(
+        "SELECT creator_id, platform, platform_account_id FROM platform_accounts"
+        " WHERE account_id = ?",
+        (account_id,),
+    ).fetchone()
+    assert creator["display_name"] == "A Creator"
+    assert set(json.loads(creator["aliases"])) == {"A Creator", "UC123"}
+    assert tuple(account) == (creator_id, "youtube", "UC123")
+
+
+def test_create_profile_keeps_the_resolved_channel_id_and_matches_video_names(db):
+    creator_id, _ = identity.create_profile(
+        db, "Creator Brand", "youtube", "Channel Display Name", "UC1234567890123456789012"
+    )
+
+    account = db.conn.execute(
+        "SELECT platform_account_id, username FROM platform_accounts WHERE creator_id = ?",
+        (creator_id,),
+    ).fetchone()
+    assert tuple(account) == ("UC1234567890123456789012", "Channel Display Name")
+    assert (
+        identity.resolve(db, "abcdefghijk", "Channel Display Name", platform="youtube")
+        == creator_id
+    )
+    account_match = identity.find_account(db, "youtube", "Channel Display Name")
+    assert account_match["creator_id"] == creator_id
+
+
+def test_create_profile_does_not_take_a_channel_from_another_profile(db):
+    existing = identity.resolve(db, "tw_1", "SomeStreamer", platform="twitch")
+
+    try:
+        identity.create_profile(db, "Other Profile", "TWITCH", "somestreamer")
+    except ValueError as e:
+        assert "already belongs to" in str(e)
+    else:
+        raise AssertionError("duplicate channels should not silently move profiles")
+
+    assert db.conn.execute("SELECT COUNT(*) FROM creators").fetchone()[0] == 1
+    assert db.conn.execute(
+        "SELECT creator_id FROM platform_accounts WHERE platform = 'twitch'"
+    ).fetchone()[0] == existing
 
 
 def test_case_does_not_make_a_second_profile(db):
