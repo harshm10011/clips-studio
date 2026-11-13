@@ -22,7 +22,10 @@ import mascot from './assets/mascot.png'
 
 type Page = 'dashboard' | 'queue' | 'watch' | 'studio' | 'creators' | 'marketplace' | 'models' | 'settings'
 
-const GITHUB_URL = 'https://github.com/ColinGPT9/clips-studio'
+const GITHUB_URL =
+  window.studio.platform === 'darwin'
+    ? 'https://github.com/harshm10011/clips-studio'
+    : 'https://github.com/ColinGPT9/clips-studio'
 
 const NAV: { id: Page; label: string; icon: string }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: '◧' },
@@ -52,6 +55,9 @@ export default function App(): JSX.Element {
   // (Ollama, a model) before they hit a video that fails for want of it.
   // Settings can re-open it, so this is not a one-shot.
   const [wizard, setWizard] = useState(!setupDone())
+  useEffect(() => {
+    document.title = window.studio.platform === 'darwin' ? 'ClipForge' : 'Clips Kitty'
+  }, [])
   useEffect(() => {
     const open = (): void => setWizard(true)
     window.addEventListener('open-setup-wizard', open)

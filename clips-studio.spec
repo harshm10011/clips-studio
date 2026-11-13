@@ -88,7 +88,6 @@ hiddenimports += [
     "torchvision",
     "cv2",
     "psutil",
-    "pynvml",
     "google.auth",
     "google_auth_oauthlib",
     "googleapiclient",
@@ -127,6 +126,11 @@ hiddenimports += [
     # plugin marker (_clipskitty_script_host.py).
     "_clipskitty_script_host",
 ]
+if sys.platform != "darwin":
+    # NVIDIA telemetry is not installed on macOS. Keeping this as an explicit
+    # hidden import makes PyInstaller warn about a dependency the Mac build
+    # intentionally excludes.
+    hiddenimports.append("pynvml")
 
 # The whole standard library, for pipelines. They run on this Python
 # (_clipskitty_script_host.py), and PyInstaller otherwise packs only the
@@ -263,9 +267,10 @@ for _voice in ("pyannote_segmentation_3.onnx", "wespeaker_resnet34_lm.onnx"):
 # ffmpeg/ folder next to the executable.
 vendor_ffmpeg = ROOT / "vendor" / "ffmpeg"
 if vendor_ffmpeg.exists():
-    for binary in vendor_ffmpeg.iterdir():
-        if binary.is_file():
-            datas += [(str(binary), "ffmpeg")]
+    for item in vendor_ffmpeg.rglob("*"):
+        if item.is_file():
+            relative_dir = Path("ffmpeg") / item.relative_to(vendor_ffmpeg).parent
+            datas += [(str(item), str(relative_dir))]
 
 # QuickJS-ng, fetched by scripts/fetch_quickjs.py: runs YouTube's player
 # JavaScript for the YouTube cookies fallback only. core.binaries.quickjs looks

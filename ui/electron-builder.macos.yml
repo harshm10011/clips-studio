@@ -1,0 +1,48 @@
+# Standalone macOS build configuration. It deliberately does not inherit the
+# Windows release feed from electron-builder.yml; Mac updates stay disabled
+# until this fork has its own signed and published update channel.
+appId: com.clipforge.app
+productName: ClipForge
+copyright: Copyright © 2026 ClipForge contributors
+
+directories:
+  output: ../release
+  buildResources: build
+
+afterPack: build/afterPack.cjs
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: ../build/dist/backend
+    to: backend
+    filter:
+      - "**/*"
+  - from: ../LICENSE
+    to: documentation/ClipForge-LICENSE.txt
+  - from: ../docs/macos
+    to: documentation
+    filter:
+      - "*.md"
+  - from: ../build/macos-release/SBOM.json
+    to: documentation/SBOM.json
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  icon: build/icon.icns
+  category: public.app-category.video
+  artifactName: ClipForge-${version}-${arch}.${ext}
+  # Release signing is activated by the build driver only when the developer
+  # identity and hardened-runtime entitlements have been configured.
+  identity: null
+
+publish: []
+compression: store

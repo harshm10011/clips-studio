@@ -1,0 +1,10 @@
+# Apple Silicon runtime and build dependencies for the frozen Mac backend.
+# Install in a clean Python 3.11 ARM64 virtual environment:
+#   python3.11 -m pip install -r requirements-macos.txt
+-r requirements.txt
+-r requirements-build.txt
+
+# PyTorch's macOS wheel provides MPS where the host OS and model path support
+# it. The pipeline keeps its CPU fallback; never install a CUDA wheel here.
+torch>=2.5,<3
+torchvision>=0.20,<1

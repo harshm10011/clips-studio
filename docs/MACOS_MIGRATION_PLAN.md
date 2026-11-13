@@ -25,7 +25,7 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - Local Whisper weights are dropped after transcription. A local Ollama model stays warm across queued videos while available memory is healthy and unloads after a run when estimated headroom is tight; remote Ollama hosts are never sent unload requests. Unused PyTorch cache is also cleared at the job boundary.
 - FFmpeg is queried for VideoToolbox encoders. Whisper stays on CPU on MPS because the current faster-whisper/CTranslate2 backend has no MPS or Core ML path.
 - Core ML is detected as a macOS system runtime. Python conversion tools and WhisperKit are reported separately; neither is installed in this environment, so no Core ML transcription path is claimed.
-- Hardware report and pure-Python profile tests pass. No M4 inference benchmark has run yet because Ollama and an MPS-enabled PyTorch build are absent.
+- Hardware report and pure-Python profile tests pass. Ollama is now staged, but no M4 inference benchmark has run: no local model has been downloaded, and the installed PyTorch build reports MPS unavailable.
 
 - Report ARM64 architecture, unified memory, MPS availability, Ollama status, FFmpeg encoders, and free disk space.
 - Keep one heavyweight inference job at a time on the 16 GB machine.
@@ -52,7 +52,7 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - The pipeline already checks cancellation during transcription, analysis, and rendering, retries malformed model output once, and reuses downloaded media and cached transcripts on a rerun.
 - Candidate `reason` text was generated but not saved with the clip. It is now persisted with the score details and shown in Clip Studio and the editor.
 - The default duration configuration is 10–60 seconds, with sentence fitting growing short picks toward a watchable length; the existing 60s+ option selects 61–180 seconds. Specific clips can use the existing long-form modes.
-- This environment lacks pytest, FastAPI, and UI dependencies, so no packaged end-to-end sample-video run is claimed. M4 throughput and real source/video tests remain release validation.
+- A packaged M4 end-to-end sample-video run has not been completed. M4 throughput and real source/video tests remain release validation.
 
 ## Prompt phase 05 — Professional macOS UI/UX
 
@@ -62,7 +62,7 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - Replaced the blue-navy palette with shared graphite and violet tokens and moved system controls to the same accent token. The font stack now uses the native Apple system font where available.
 - macOS uses the native inset traffic lights with a reserved title-bar gutter. The other desktop platforms retain their standard title bar.
 - Added Command+1–8 navigation on macOS (Control+1–8 on Windows/Linux) in sidebar order, with the active destination exposed to assistive technology.
-- UI dependencies are not installed here, so the packaged M4 visual review and build are still pending.
+- UI dependencies are installed, and UI typecheck plus production build pass. Packaged M4 visual review remains pending.
 
 ## Prompt phase 06 — Automatic subtitles and video editor
 
@@ -72,7 +72,7 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - Added a per-clip 1:1 square format. It renders at 1080×1080 with a centered crop; the editor labels that choice and keeps the preview, watermark, captions, and final render on the square canvas. Choose Vertical to use the existing AI speaker-tracking crop.
 - Added caption templates plus controls for outline colour/width and a background box with colour/opacity. Added common macOS fonts and automatic macOS script-font choices for supported languages.
 - Added H.265 MP4 export and selectable 4, 8, or 12 Mb/s encoding. macOS tries VideoToolbox first, then FFmpeg's libx265; default H.264 export still copies the already-rendered file.
-- UI dependencies are absent here, so no M4 sample render has been reviewed. A later synthetic Phase 7 benchmark confirmed H.264 VideoToolbox encoding; H.265 hardware encoding still depends on the FFmpeg build and has not been exercised end to end.
+- No M4 sample render has been reviewed. A later synthetic Phase 7 benchmark confirmed H.264 VideoToolbox encoding; H.265 hardware encoding still depends on the FFmpeg build and has not been exercised end to end.
 
 ## Prompt phase 07 — Batch processing and performance
 
@@ -86,6 +86,8 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - The current environment is an M4 MacBook Air with 16 GB RAM and FFmpeg VideoToolbox H.264/H.265 encoders. A 720p synthetic 5/15-second run encoded at 235/363 fps (7.83×/12.11× real time); 1080p encoded at 161/206 fps (5.36×/6.88×). Peak FFmpeg process RSS was about 76/76 MB at 720p and 122 MB at 1080p. Synthetic patterns are easier to encode than real footage; representative creator media and full AI throughput still need separate measurement.
 
 ## Milestone 03 — Native macOS process and package
+
+**Status: local ARM64 app, DMG, and ZIP built; unsigned package validation remains.**
 
 - Build the Python 3.11 backend for ARM64 with PyInstaller on macOS.
 - Bundle ARM64 FFmpeg, QuickJS, Ollama, model assets, and required notices with separate pinned fetchers.
@@ -113,9 +115,43 @@ After this works reliably, polish the Mac-first onboarding, model manager, setti
 - Document source access limitations and keep local-file import available.
 - Retain AGPL-3.0-or-later and all bundled third-party license notices.
 
+## Prompt phase 08 — Final testing, packaging, and release
+
+**Status: first local package produced; release validation remains incomplete.**
+
+- Added `scripts/build_macos.py` for native ARM64 dependency checks, FFmpeg
+  dynamic-library staging, Ollama staging, PyInstaller freezing, frozen API
+  health smoke check, SPDX inventory generation, and Electron DMG/ZIP output.
+- Installed Python 3.11 and runtime/build dependencies, staged FFmpeg and the
+  checksum-verified universal Ollama runtime, built the frozen backend, and
+  produced `release/mac-arm64/ClipForge.app` and
+  `release/ClipForge-2.1.0-arm64.dmg`. The packaged backend `/health` smoke
+  check passed. Electron Builder produced the ARM64 DMG and ZIP.
+- The UI typecheck and production build passed. The generated SPDX inventory
+  contains 218 dependency/runtime entries. The app bundle is ARM64, unsigned,
+  and not notarized.
+- A focused suite of 113 macOS, storage path, preflight, model setup/recovery,
+  and job readiness/progress tests passed. DMG checksum verification and ZIP
+  integrity checks also passed.
+- Added a checksum-verified fetcher for the official universal macOS Ollama
+  release. The Electron Mac config is standalone and does not inherit the
+  upstream Windows updater feed.
+- Packaged Mac startup now waits for `GET /health`, records backend logs, and
+  stops bundled backend/Ollama process groups on quit. Setup and preflight
+  already cover first model setup, retry, missing runtime/model reporting, and
+  disk-space warnings.
+- Added installation, user, troubleshooting, release notes, and third-party
+  license documents under `docs/macos/`.
+- Remaining before a stable release: finish ZIP validation and launch the
+  packaged GUI; run packaged first-run model setup, missing-model recovery,
+  low-disk, interrupted-job, long-video, batch-export, and no-paid-API
+  end-to-end checks. The Mac update feed remains deliberately disabled. Review
+  npm's 24 reported dependency audit advisories, then sign and notarize before
+  public distribution.
+
 ## Current blockers
 
 - The public fork `harshm10011/clips-studio` and `macos/m4-support` branch are created, and milestone pushes are working. The Git metadata lives at `/private/tmp/clipforge-source/.git` for this managed checkout.
-- Python 3.14.2, Node 24.11.1, and npm 11.6.2 are present. Python 3.11, pytest, FastAPI, faster-whisper, yt-dlp, coremltools, Ollama, and UI `node_modules` are absent; NumPy, OpenCV, PyTorch, and psutil are available. Python 3.14 cannot be used for the planned frozen Python 3.11 runtime build.
-- The installed PyTorch build reports MPS unavailable. Hardware encoding was measured through VideoToolbox, but real Apple AI inference, transcription, and an end-to-end sample render still need the matching runtime dependencies.
-- The macOS package and production rendering pipeline have not been built or exercised yet.
+- Python 3.11.18, Node 24.11.1, and npm 11.6.2 are installed. The macOS Python dependencies and UI packages are present in the local build environment; `pip check` passes. Python 3.14 remains unsuitable for the required frozen runtime.
+- The frozen backend health check passes, and staged FFmpeg produced a 720p H.264 VideoToolbox sample. The installed PyTorch build reports MPS unavailable; real transcription, AI inference, and a complete sample render through the packaged app still need validation.
+- The local app is an unsigned development preview, not a stable release. Packaged first-run, recovery, disk-pressure, interrupted-job, long-video, batch, and no-paid-API workflows remain untested end to end. npm reported 24 dependency audit advisories; inspect before public distribution.

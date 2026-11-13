@@ -30,6 +30,7 @@ import { isMicrosoftStore } from './distribution'
 import { dropStalePartials } from './stalePartials'
 
 const API_PORT = 8765
+const APP_NAME = process.platform === 'darwin' ? 'ClipForge' : 'Clips Kitty'
 
 // One definition for both routes below: the in-app popup and, for Store
 // copies, the system browser. They must not be able to drift apart.
@@ -43,6 +44,7 @@ const OLLAMA_HOST = `127.0.0.1:${OLLAMA_PORT}`
 
 let backend: ChildProcess | null = null
 let ollama: ChildProcess | null = null
+let backendLogFd: number | null = null
 
 /** Large model and video files belong in a stable per-user data folder, not
  *  Electron's Local Storage directory or the installed application bundle. */
@@ -116,7 +118,7 @@ async function ensureTray(): Promise<void> {
     .catch(() => nativeImage.createEmpty())
   if (tray) return // a second close raced this one
   tray = new Tray(icon)
-  tray.setToolTip('Clips Kitty: watching for new videos')
+  tray.setToolTip(`${APP_NAME}: watching for new videos`)
   await refreshTrayMenu()
   if (!tray) return
   trayUpdateTimer = setInterval(() => void refreshTrayMenu(), 30000)
@@ -133,7 +135,7 @@ async function refreshTrayMenu(): Promise<void> {
   } catch { /* The optional feature can be unavailable in an older engine. */ }
   tray?.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Open Clips Kitty', click: showWindow },
+      { label: `Open ${APP_NAME}`, click: showWindow },
       { label: 'Away from desk', type: 'checkbox', checked: status.away_from_desk === true,
         enabled: status.enabled === true && (status.away_from_desk === true || (status.connected === true && status.test_ok === true)),
         click: async (item) => {
@@ -148,7 +150,7 @@ async function refreshTrayMenu(): Promise<void> {
         } },
       { type: 'separator' },
       // before-quit asks first if a model is downloading.
-      { label: 'Quit Clips Kitty', click: () => app.quit() }
+      { label: `Quit ${APP_NAME}`, click: () => app.quit() }
     ])
   )
 }
@@ -203,7 +205,7 @@ async function confirmQuit(parent: BrowserWindow | null): Promise<boolean> {
     buttons: ['Quit anyway', 'Keep downloading'],
     defaultId: 1,
     cancelId: 1,
-    title: 'Clips Kitty',
+    title: APP_NAME,
     message: 'A model is still downloading. Quit anyway?',
     // Nothing starts it again by itself: the engine forgets its downloads
     // when it stops. Started again, it carries on rather than starting over
@@ -249,7 +251,7 @@ function openOllamaLog(dir: string): number | null {
     const fd = openSync(join(dir, 'ollama.log'), 'a')
     ollamaLogDir = dir
     try {
-      writeSync(fd, `\n--- ${new Date().toISOString()} Clips Kitty started Ollama ---\n`)
+      writeSync(fd, `\n--- ${new Date().toISOString()} ${APP_NAME} started Ollama ---\n`)
     } catch {
       // Only a marker between runs; the log works without it.
     }
@@ -309,6 +311,7 @@ function startOllama(): void {
   const stdio: StdioOptions = log === null ? 'ignore' : ['ignore', log, log]
   ollama = spawn(exe, ['serve'], {
     stdio,
+    detached: process.platform === 'darwin',
     env: {
       ...process.env,
       OLLAMA_HOST,
@@ -349,6 +352,16 @@ function killTree(child: ChildProcess | null): void {
       // Already exited, or taskkill is unavailable — fall through to a signal.
     }
   }
+  if (process.platform === 'darwin') {
+    try {
+      // Packaged Mac children use their own process group, so stopping the app
+      // also stops Ollama's model runner and any engine subprocesses.
+      process.kill(-child.pid, 'SIGTERM')
+      return
+    } catch {
+      // The child already exited, or it could not create its process group.
+    }
+  }
   child.kill()
 }
 
@@ -360,6 +373,44 @@ function stopChildren(): void {
   backend = null
   ollama = null
   setAsideBigOllamaLog()
+}
+
+function writeBackendLog(chunk: string | Buffer): void {
+  if (backendLogFd === null) return
+  try {
+    if (typeof chunk === 'string') writeSync(backendLogFd, chunk)
+    else writeSync(backendLogFd, chunk)
+  } catch {
+    // Logging must never take down the engine process or app shutdown.
+  }
+}
+
+function closeBackendLog(): void {
+  if (backendLogFd === null) return
+  try {
+    closeSync(backendLogFd)
+  } catch {
+    // The handle may already have closed during shutdown.
+  }
+  backendLogFd = null
+}
+
+function openBackendLog(): number | null {
+  try {
+    const directory = join(installedDataRoot(), 'logs')
+    mkdirSync(directory, { recursive: true })
+    const file = join(directory, 'backend.log')
+    try {
+      if (statSync(file).size > 10 * 1024 * 1024) renameSync(file, join(directory, 'backend.old.log'))
+    } catch {
+      // No log yet, or a previous log could not be rotated.
+    }
+    const fd = openSync(file, 'a', 0o600)
+    writeSync(fd, `\n--- ${new Date().toISOString()} ClipForge backend started ---\n`)
+    return fd
+  } catch {
+    return null
+  }
 }
 
 /** Ollama logs every request it serves, so its log would grow for as long as
@@ -388,6 +439,7 @@ function startBackend(): void {
     ...process.env,
     PYTHONIOENCODING: 'utf-8',
     PYTHONUTF8: '1',
+    PYTHONUNBUFFERED: '1',
     CLIPS_KITTY_SESSION_SECRET: SESSION_SECRET
   }
   // The engine runs a pipeline's Python script when this is set
@@ -408,22 +460,56 @@ function startBackend(): void {
     // The backend is built as a console app so its prints have somewhere to
     // go (a windowed build gives it no stdout, and every print() then
     // throws). windowsHide keeps that console from flashing up at the user.
+    const macBackend = process.platform === 'darwin'
+    if (macBackend) backendLogFd = openBackendLog()
     backend = spawn(exe, ['serve', '--port', String(API_PORT)], {
-      stdio: 'ignore',
+      stdio: macBackend && backendLogFd !== null ? ['ignore', 'pipe', 'pipe'] : 'ignore',
       env: backendEnv,
-      windowsHide: true
+      windowsHide: true,
+      detached: process.platform === 'darwin'
+    })
+    backend?.stdout?.on('data', writeBackendLog)
+    backend?.stderr?.on('data', writeBackendLog)
+    backend?.on('error', (error) => {
+      writeBackendLog(`backend spawn error: ${error.message}\n`)
+      closeBackendLog()
     })
   } else if (process.env.BACKEND_EXTERNAL !== '1') {
     const repoRoot = join(app.getAppPath(), '..')
     backend = spawn('python', ['main.py', 'serve', '--port', String(API_PORT)], {
       cwd: repoRoot,
       stdio: 'inherit',
-      env: backendEnv
+      env: backendEnv,
+      detached: process.platform === 'darwin'
     })
   }
   backend?.on('exit', (code) => {
     if (code !== 0 && code !== null) console.error(`backend exited with code ${code}`)
+    closeBackendLog()
   })
+}
+
+/** Wait for the local API before opening the full renderer. The frozen Python
+ *  process imports several large libraries at startup; without this check the
+ *  first UI requests can race those imports and look like a broken install. */
+async function waitForBackend(timeoutMs = 20000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (backend && backend.exitCode !== null) return false
+    try {
+      const response = await fetch(`http://127.0.0.1:${API_PORT}/health`, {
+        signal: AbortSignal.timeout(1500)
+      })
+      if (response.ok) {
+        const health = (await response.json()) as { ok?: boolean; api_version?: unknown }
+        if (health.ok === true && typeof health.api_version === 'number') return true
+      }
+    } catch {
+      // Expected until Uvicorn binds; retry while the child is alive.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return false
 }
 
 function createWindow(): void {
@@ -432,6 +518,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1080,
     minHeight: 700,
+    title: APP_NAME,
     backgroundColor: '#111115',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: process.platform === 'darwin' ? { x: 14, y: 14 } : undefined,
@@ -469,7 +556,7 @@ function createWindow(): void {
           if (!toldAboutTray && Notification.isSupported()) {
             toldAboutTray = true
             new Notification({
-              title: 'Clips Kitty is still watching',
+              title: `${APP_NAME} is still watching`,
               body: 'It keeps running in the system tray. Quit it from the tray icon.'
             }).show()
           }
@@ -886,7 +973,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', showWindow)
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     // Windows shows the AppUserModelID as the notification's app name; without
     // it a toast is attributed to "electron.app.Electron". Must match
     // electron-builder.yml's appId so dev and packaged builds agree.
@@ -896,7 +983,21 @@ if (!app.requestSingleInstanceLock()) {
     // the engine means the first preflight is more likely to find it up.
     startOllama()
     startBackend()
+    const backendReady = process.platform !== 'darwin' || await waitForBackend()
     createWindow()
+    if (!backendReady) {
+      const response = await dialog.showMessageBox(mainWindow!, {
+        type: 'warning',
+        title: 'ClipForge local engine not ready',
+        message: 'ClipForge could not connect to its local engine.',
+        detail:
+          'The app will stay open, but model setup and video actions will not work until the engine starts. Restart ClipForge. If this keeps happening, check the app logs in ~/Library/Application Support/ClipForge/logs.',
+        buttons: ['Continue', 'Quit'],
+        defaultId: 0,
+        cancelId: 0
+      })
+      if (response.response === 1) app.quit()
+    }
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })

@@ -13,7 +13,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
     "package": "electron-vite build && electron-builder --win",
-    "package:mac:arm64": "electron-vite build && electron-builder --mac --arm64"
+    "package:mac:arm64": "electron-vite build && electron-builder --mac --arm64 --config electron-builder.macos.yml"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

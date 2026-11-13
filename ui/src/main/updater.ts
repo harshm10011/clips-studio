@@ -180,6 +180,24 @@ export function setupUpdater(win: BrowserWindow): void {
     return { ok: true }
   })
 
+  // This fork has no Mac update feed yet. Do not let a ClipForge Mac build
+  // read the Windows project's global Hugging Face feed from the shared
+  // electron-builder config, or report a misleading network failure.
+  if (process.platform === 'darwin') {
+    const state = app.isPackaged ? 'unavailable' : 'dev'
+    const tell = (): void => send('update:state', { state })
+    ipcMain.handle('update:check', async () => {
+      tell()
+      return { ok: false, reason: 'mac-feed-unconfigured' }
+    })
+    ipcMain.handle('update:download', async () => ({ ok: false }))
+    ipcMain.handle('update:install', () => ({ ok: false }))
+    ipcMain.handle('update:skip', () => ({ ok: false }))
+    ipcMain.handle('update:prefs', (_e, _patch: unknown) => loadPrefs())
+    setTimeout(tell, 500)
+    return
+  }
+
   // A Store copy is updated by the Store. electron-updater is not merely
   // unnecessary there, it is wrong: it would fetch the NSIS installer and try
   // to run it over a package Windows itself manages. So it is never wired up

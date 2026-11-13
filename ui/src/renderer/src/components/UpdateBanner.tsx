@@ -50,7 +50,7 @@ export default function UpdateBanner(): JSX.Element | null {
   }, [])
 
   // Nothing to say when there's no update, we're mid-check or we're in dev.
-  if (!s || s.state === 'none' || s.state === 'checking' || s.state === 'dev') return null
+  if (!s || s.state === 'none' || s.state === 'checking' || s.state === 'dev' || s.state === 'unavailable') return null
   // A failed background check is not the user's problem; Settings shows it.
   if (s.state === 'error') return null
 

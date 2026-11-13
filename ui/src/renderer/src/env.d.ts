@@ -13,7 +13,7 @@ declare module '*.png' {
 interface UpdateState {
   // 'store': installed from the Microsoft Store, which updates the app itself.
   // `version` is then what the Store offers (absent when it couldn't be asked).
-  state: 'checking' | 'available' | 'none' | 'downloading' | 'ready' | 'error' | 'dev' | 'store'
+  state: 'checking' | 'available' | 'none' | 'downloading' | 'ready' | 'error' | 'dev' | 'store' | 'unavailable'
   version?: string
   /** 'store' only: the version running, whether the Store has a newer one,
    *  and whether the user chose to skip that one (the bar stays hidden). */

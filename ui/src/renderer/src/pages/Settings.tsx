@@ -401,6 +401,7 @@ function UpdateCard(): JSX.Element {
   const [state, setState] = useState<UpdateState | null>(null)
   const [channel, setChannel] = useState('stable')
   const [asked, setAsked] = useState(false)
+  const macOS = window.studio.platform === 'darwin'
 
   useEffect(() => {
     // Guarded for the same reason as the update bar: a preload without this
@@ -415,6 +416,7 @@ function UpdateCard(): JSX.Element {
   }, [])
 
   const line = ((): string => {
+    if (macOS) return 'Mac automatic updates are not published for this build yet.'
     if (!asked && !state) return 'Clips Kitty checks for updates when it starts.'
     switch (state?.state) {
       case 'checking':
@@ -453,16 +455,18 @@ function UpdateCard(): JSX.Element {
       <h3 className="font-semibold">{t('Updates')}</h3>
       <p className="text-sm text-muted">{line}</p>
       <div className="flex items-center gap-3 flex-wrap">
-        <button
-          className="btn-ghost !py-1.5"
-          disabled={state?.state === 'checking'}
-          onClick={() => {
-            setAsked(true)
-            void window.studio.update.check()
-          }}
-        >
-          {state?.state === 'checking' ? 'Checking…' : t('Check for updates')}
-        </button>
+        {!macOS && (
+          <button
+            className="btn-ghost !py-1.5"
+            disabled={state?.state === 'checking'}
+            onClick={() => {
+              setAsked(true)
+              void window.studio.update.check()
+            }}
+          >
+            {state?.state === 'checking' ? 'Checking…' : t('Check for updates')}
+          </button>
+        )}
         {state?.state === 'store' && (
           <button
             className={`${state.behind ? 'btn-accent' : 'btn-ghost'} !py-1.5`}
@@ -471,33 +475,35 @@ function UpdateCard(): JSX.Element {
             {t('Open the Microsoft Store')}
           </button>
         )}
-        <label className="flex items-center gap-2 text-xs text-muted">
-          {t('Release channel')}
-          <select
-            className="input !w-32 !py-1 text-xs"
-            value={channel}
-            onChange={(e) => {
-              setChannel(e.target.value)
-              void window.studio.update.prefs({ channel: e.target.value })
-            }}
-          >
-            <option value="stable">Stable</option>
-            <option value="beta">Beta</option>
-            <option value="alpha">Alpha</option>
-          </select>
-        </label>
+        {!macOS && (
+          <label className="flex items-center gap-2 text-xs text-muted">
+            {t('Release channel')}
+            <select
+              className="input !w-32 !py-1 text-xs"
+              value={channel}
+              onChange={(e) => {
+                setChannel(e.target.value)
+                void window.studio.update.prefs({ channel: e.target.value })
+              }}
+            >
+              <option value="stable">Stable</option>
+              <option value="beta">Beta</option>
+              <option value="alpha">Alpha</option>
+            </select>
+          </label>
+        )}
       </div>
-      <p className="text-[11px] text-muted">
-        Stable is finished releases only. Beta and Alpha get new features earlier and break
-        more often. Nothing downloads or installs without you asking.
-      </p>
+      {!macOS && (
+        <p className="text-[11px] text-muted">
+          Stable is finished releases only. Beta and Alpha get new features earlier and break
+          more often. Nothing downloads or installs without you asking.
+        </p>
+      )}
     </div>
   )
 }
 
-/** Re-run first-run setup, and a live view of what the install is missing.
- *  Ollama and the model are deliberately not bundled, so this is where
- *  someone checks whether the app can actually make a clip. */
+/** Re-run first-run setup, and a live view of what the install is missing. */
 function SetupCard(): JSX.Element {
   const [pre, setPre] = useState<Preflight | null>(null)
   useEffect(() => {
