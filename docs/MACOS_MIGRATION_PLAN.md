@@ -43,6 +43,17 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - Source access is limited to what each platform adapter can read. Private, removed, unavailable, or unsupported sources keep their source error; local file import remains available as a fallback. No DRM or access-control bypass is added.
 - The profile setup API and UI are implemented, but macOS runtime behavior and full source-access coverage still need validation on the packaged app.
 
+## Prompt phase 04 — AI highlight detection and clip generation
+
+**Status: core pipeline audited; selection rationale now reaches the clip library.**
+
+- The existing pipeline extracts timestamped word-level transcripts, caches them per video, and scores transcript candidates together with audio, visual, reaction, and optional audience signals. It uses transcript context and sentence-aware timing rather than keyword-only selection.
+- Candidates are checked for minimum score, duplicates, overlap, segment reuse, and configured duration limits; surviving moments are ranked, titled, described, captioned, and rendered through FFmpeg.
+- The pipeline already checks cancellation during transcription, analysis, and rendering, retries malformed model output once, and reuses downloaded media and cached transcripts on a rerun.
+- Candidate `reason` text was generated but not saved with the clip. It is now persisted with the score details and shown in Clip Studio and the editor.
+- The default duration configuration is 10–60 seconds, with sentence fitting growing short picks toward a watchable length; the existing 60s+ option selects 61–180 seconds. Specific clips can use the existing long-form modes.
+- This environment lacks pytest, FastAPI, and UI dependencies, so no packaged end-to-end sample-video run is claimed. M4 throughput and real source/video tests remain release validation.
+
 ## Milestone 03 — Native macOS process and package
 
 - Build the Python 3.11 backend for ARM64 with PyInstaller on macOS.

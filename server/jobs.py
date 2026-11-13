@@ -815,9 +815,16 @@ class Worker(threading.Thread):
 
         start = float(payload.get("start", clip["start_s"]))
         end = float(payload.get("end", clip["end_s"]))
+        try:
+            clip_scores = _json.loads(clip["scores"]) if clip["scores"] else {}
+        except (TypeError, ValueError):
+            clip_scores = {}
+        if not isinstance(clip_scores, dict):
+            clip_scores = {}
         candidate = ClipCandidate(
             start=start, end=end, score=clip["score"], hook=clip["hook"] or "",
-            subscores=_json.loads(clip["scores"]) if clip["scores"] else None,
+            reason=clip_scores.get("selection_reason", ""),
+            subscores=clip_scores or None,
         )
 
         # Persisted render options, overlaid with this edit's changes.

@@ -1991,6 +1991,7 @@ def _register_clip(
     renderer silently left two of the four longform profiles with no end card.
     Hooking the funnel means a mode added later cannot miss it either.
     """
+    scores = _candidate_scores(candidate)
     clip_id = db.add_clip(
         video_id,
         candidate.start,
@@ -2002,7 +2003,7 @@ def _register_clip(
         title=meta.title,
         description=meta.description,
         hashtags=json.dumps(meta.hashtags),
-        scores=json.dumps(candidate.subscores or {}),
+        scores=json.dumps(scores),
         render_opts=render_opts_json,
     )
     if clip_id is None:
@@ -2013,7 +2014,7 @@ def _register_clip(
             (video_id, round(candidate.start, 2), round(candidate.end, 2)),
         ).fetchone()
         if row:
-            fresh = {"path": str(final_path), "scores": json.dumps(candidate.subscores or {})}
+            fresh = {"path": str(final_path), "scores": json.dumps(scores)}
             rendered = json.loads(render_opts_json) if render_opts_json else {}
             existing = db.get_clip(row["id"])
             kept = json.loads(existing["render_opts"]) if existing and existing["render_opts"] else {}
@@ -2040,11 +2041,13 @@ def _register_clip(
                 # without the row's saved edit (plugins/edit_marks.py).
                 from plugins import edit_marks
 
-                scores = dict(candidate.subscores or {})
-                scores["plugin_edits"] = edit_marks.carry(old_edits, scores.get("plugin_edits"), kept, rendered)
-                if not scores["plugin_edits"]:
-                    del scores["plugin_edits"]
-                fresh["scores"] = json.dumps(scores)
+                fresh_scores = dict(scores)
+                fresh_scores["plugin_edits"] = edit_marks.carry(
+                    old_edits, fresh_scores.get("plugin_edits"), kept, rendered
+                )
+                if not fresh_scores["plugin_edits"]:
+                    del fresh_scores["plugin_edits"]
+                fresh["scores"] = json.dumps(fresh_scores)
             if rendered.get("speaker_turns") != kept.get("speaker_turns"):
                 # The other speaker's turns: the row's must be the ones this
                 # file was burned with, or the editor colours its preview by
@@ -2072,3 +2075,11 @@ def _register_clip(
 
     print(f"      -> {final_path}  ({meta.title})")
     return RenderedClip(source_video_id=video_id, candidate=candidate, path=final_path)
+
+
+def _candidate_scores(candidate) -> dict:
+    """Store a candidate's selection reason beside the signal scores."""
+    scores = dict(candidate.subscores or {})
+    if candidate.reason:
+        scores["selection_reason"] = candidate.reason
+    return scores

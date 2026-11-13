@@ -71,9 +71,13 @@ export default function ClipCard({
     <div className="relative group">
       <button
         onClick={onClick}
-        aria-label={`${name}${moment ? `, ${moment}` : ''}, ${duration} seconds, score ${clip.score}${
-          badge ? ', horizontal longform' : ', vertical Short'
-        }${suggested ? ', suggested edit' : ''}${exported ? ', exported' : ''}${selected ? ', selected' : ''}`}
+        aria-label={
+          `${name}${moment ? `, ${moment}` : ''}, ${duration} seconds, score ${clip.score}` +
+          `${badge ? ', horizontal longform' : ', vertical Short'}` +
+          `${clip.scores.selection_reason ? `, why selected: ${clip.scores.selection_reason}` : ''}` +
+          `${suggested ? ', suggested edit' : ''}${exported ? ', exported' : ''}` +
+          `${selected ? ', selected' : ''}`
+        }
         aria-pressed={selected}
         className={`w-full text-left rounded-xl overflow-hidden bg-surface border transition-colors ${
           selected ? 'border-accent' : 'border-raised/60 hover:border-raised'
@@ -120,6 +124,14 @@ export default function ClipCard({
           <p className="text-sm font-medium line-clamp-2">
             {clip.title || clip.hook || 'Untitled clip'}
           </p>
+          {clip.scores.selection_reason && (
+            <p
+              className="text-xs text-muted mt-1 line-clamp-2"
+              title={t('Why the AI selected this moment')}
+            >
+              {clip.scores.selection_reason}
+            </p>
+          )}
           {moment && (
             <p className="text-xs text-accent mt-1 truncate" title={clip.scores.sport_why}>
               {moment}

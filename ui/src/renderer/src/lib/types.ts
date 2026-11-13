@@ -94,6 +94,8 @@ export interface SubScores {
   visual?: number
   reaction?: number
   engagement?: number
+  /** The transcript-grounded reason the model gave for selecting this clip. */
+  selection_reason?: string
   /** The gaming profile: how strongly chat, the streamer and the game mark an
    *  in-game moment here, what marked it, and the bonus when they agree. */
   game?: number

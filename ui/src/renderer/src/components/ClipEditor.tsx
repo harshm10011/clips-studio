@@ -143,6 +143,11 @@ export default function ClipEditor({
           </span>
         )}
       </div>
+      {clip.scores.selection_reason && (
+        <p className="text-xs text-muted -mt-2" title={t('Why the AI selected this moment')}>
+          {clip.scores.selection_reason}
+        </p>
+      )}
       {clip.scores.game_why && <p className="text-xs text-muted -mt-2">{clip.scores.game_why}</p>}
       {clip.scores.sport_why && (
         <p className="text-xs text-muted -mt-2" title={t("What marked this moment")}>
