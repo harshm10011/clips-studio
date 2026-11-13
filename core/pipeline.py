@@ -178,6 +178,34 @@ def _with_usable_model(llm_config: dict) -> dict:
     return {**llm_config, "backend": f"ollama/{usable}"}
 
 
+def _release_local_model_for_memory(config: dict, llm) -> None:
+    """Free the local Ollama model after a completed video on smaller Macs."""
+    try:
+        from core.macos.memory import release_torch_cache
+
+        release_torch_cache()
+    except Exception:
+        pass  # best-effort cleanup must not fail a finished job
+
+    backend = str((config.get("llm") or {}).get("backend") or "")
+    if not backend.startswith("ollama/") and "/" in backend:
+        return  # a remote provider; never send it an Ollama unload request
+    model_name = str(getattr(llm, "name", ""))
+    if not model_name.startswith("ollama/"):
+        return
+    try:
+        from core.macos.memory import memory_snapshot
+        from core.macos.models import release_model_for_memory_profile
+
+        host = str((config.get("llm") or {}).get("ollama_host") or "http://localhost:11434")
+        total_bytes = memory_snapshot().total_bytes
+        released = release_model_for_memory_profile(model_name.split("/", 1)[1], host, total_bytes)
+        if released:
+            print("      Released the local language model to free memory for the next video")
+    except Exception as exc:
+        print(f"      (could not release the local model: {type(exc).__name__})")
+
+
 def convert_slow_source(video, config: dict) -> None:
     """One up-front H.264 conversion for a source that decodes slowly.
 
@@ -592,6 +620,7 @@ def process_video(url: str, config: dict, db: StateDB, force: bool = False) -> l
         # printing it to a log nobody opens.
         print(f"      {explain_no_clips(outcome)}")
         db.set_video_status(video.video_id, "done")
+        _release_local_model_for_memory(config, llm)
         return []
     for c in candidates:
         s = c.subscores or {}
@@ -800,6 +829,8 @@ def process_video(url: str, config: dict, db: StateDB, force: bool = False) -> l
     if sport_profile is not None and made and (sport_profile.option or {}).get("reels"):
         rendered += _sport_reels(db, video.video_id, sport_profile, made, clip_dir, config, segments,
                                  made_seconds=made_seconds)
+
+    _release_local_model_for_memory(config, llm)
 
     elapsed = time.monotonic() - started
     db.set_process_seconds(video.video_id, elapsed)

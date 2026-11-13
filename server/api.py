@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import threading
 import time
 import traceback
@@ -3050,7 +3051,20 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
 
         # Pick the model for THIS machine server-side, so the setup wizard and
         # the Models page can never give contradictory advice.
-        vram_gb = _nvidia_vram_gb()
+        if sys.platform == "darwin":
+            # Apple Silicon shares memory between macOS, PyTorch, Ollama and
+            # video buffers. CUDA VRAM is not a meaningful size for this
+            # machine, so use the current unified-memory profile instead.
+            from core.macos.models import model_recommendation
+
+            profile = model_recommendation()
+            recommended = {
+                "model": profile["recommendation"],
+                "reason": profile["reason"],
+                "memory_profile": profile,
+            }
+        else:
+            recommended = recommend_for(_nvidia_vram_gb())
 
         return {
             "active": config["llm"]["backend"],
@@ -3064,7 +3078,7 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
             "other_models": [
                 {"purpose": p, "model": m, "note": n} for p, m, n in OTHER_MODELS
             ],
-            "recommended": recommend_for(vram_gb),
+            "recommended": recommended,
         }
 
     @app.post("/models/activate")

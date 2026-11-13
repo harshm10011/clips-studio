@@ -15,6 +15,7 @@ Nothing here raises — a check that itself fails is reported as a failed check.
 
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -235,11 +236,18 @@ def check_whisper(configured: str) -> Check:
 def check_gpu() -> Check:
     """Not blocking: the app works on CPU, just slowly. Worth saying so
     plainly rather than letting someone conclude it's broken."""
-    from core.gpu import NO_GPU, cuda_usable, gpu_too_old
+    from core.gpu import NO_GPU, cuda_usable, gpu_too_old, torch_device_info
+
+    device, _ = torch_device_info()
+
+    if device == "mps":
+        return Check(name="gpu", ok=True,
+                     detail="Apple MPS available for compatible PyTorch vision models; Whisper uses CPU",
+                     blocking=False)
 
     usable, reason = cuda_usable()
 
-    if usable:
+    if device == "cuda" and usable:
         try:
             import torch
 
@@ -256,8 +264,12 @@ def check_gpu() -> Check:
     # CPU genuinely works — but it is not "fine", and the two cases share no
     # remedy at all.
     if reason == NO_GPU:
-        fix = ("Clips Kitty works without a GPU, but processing is much "
-               "slower. An NVIDIA GPU gives the biggest speed-up.")
+        if sys.platform == "darwin":
+            fix = ("Clips Kitty can still process on the CPU. Install a "
+                   "PyTorch build with Apple MPS support to accelerate compatible vision models.")
+        else:
+            fix = ("Clips Kitty works without a GPU, but processing is much "
+                   "slower. A compatible NVIDIA GPU gives the biggest speed-up.")
     elif gpu_too_old(reason):
         # Told to wait for a newer build, a GTX 10-series owner would be
         # waiting for the release that removes their card: the CUDA that adds

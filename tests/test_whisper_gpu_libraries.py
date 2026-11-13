@@ -77,6 +77,7 @@ def whisper(monkeypatch):
 
 
 def test_without_cublas_12_whisper_uses_the_cpu_and_says_why(whisper, monkeypatch, capsys):
+    monkeypatch.setattr("core.gpu.torch_device", lambda: "cuda")
     monkeypatch.setattr(transcriber, "_cuda12_blas", lambda: None)
     model = transcriber._load_model("auto", "auto")
     assert whisper == ["cpu"] and not transcriber._on_gpu(model)
@@ -91,8 +92,16 @@ def test_asking_for_the_gpu_by_name_without_cublas_12_says_what_is_missing(whisp
 
 
 def test_with_cublas_12_whisper_goes_on_the_gpu(whisper, monkeypatch):
+    monkeypatch.setattr("core.gpu.torch_device", lambda: "cuda")
     monkeypatch.setattr(transcriber, "_cuda12_blas", lambda: Path("."))
     assert transcriber._on_gpu(transcriber._load_model("auto", "auto")) and whisper == ["cuda"]
+
+
+def test_mps_auto_uses_cpu_for_current_transcriber(whisper, monkeypatch, capsys):
+    monkeypatch.setattr("core.gpu.torch_device", lambda: "mps")
+    model = transcriber._load_model("small", "auto")
+    assert whisper == ["cpu"] and not transcriber._on_gpu(model)
+    assert "MPS is not supported" in capsys.readouterr().out
 
 
 # ---- a GPU that fails once it starts ---------------------------------------------------

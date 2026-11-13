@@ -5,6 +5,7 @@ the LLM prompt) skip the expensive transcription step.
 """
 
 import ctypes
+import gc
 import json
 import os
 import re
@@ -98,6 +99,14 @@ def _load_model(model_size: str, device: str):
     # whisper_model() swaps in the bundled weights when they are present.
     def load(name: str, **kwargs):
         return WhisperModel(whisper_model(name), **kwargs)
+
+    if device == "auto":
+        from core.gpu import torch_device
+
+        selected = torch_device()
+        if selected == "mps":
+            print("  Whisper: MPS is not supported by the current faster-whisper/CTranslate2 backend; using CPU")
+        device = "cuda" if selected == "cuda" else "cpu"
 
     if device in ("auto", "cuda") and _cuda12_blas() is None:
         if device == "cuda":
@@ -226,20 +235,32 @@ def transcribe(
         _collapse_repetition_loops(segments)
         return segments
 
-    print(f"  Loading whisper model '{model_size}' (device={device})...")
-    model = _load_model(model_size, device)
+    from core.macos.memory import ai_inference_slot
 
-    try:
-        segments, info = _run(model, video_path, language, hotwords)
-    except RuntimeError as e:
-        # The GPU's libraries are only loaded at the first encode, after the
-        # model has loaded, so a GPU that loads can still fail here. The job
-        # goes on, on the CPU, rather than failing (a cancel is not a
-        # RuntimeError, and still stops it).
-        if device == "cuda" or not _on_gpu(model) or not _GPU_LIBRARY_ERROR.search(str(e)):
-            raise
-        print(f"\n  Whisper: the GPU failed ({str(e)[:120]}); transcribing again on the CPU")
-        segments, info = _run(_load_model(model_size, "cpu"), video_path, language, hotwords)
+    with ai_inference_slot("local transcription"):
+        print(f"  Loading whisper model '{model_size}' (device={device})...")
+        model = _load_model(model_size, device)
+
+        try:
+            segments, info = _run(model, video_path, language, hotwords)
+        except RuntimeError as e:
+            # The GPU's libraries are only loaded at the first encode, after
+            # the model has loaded, so a GPU that loads can still fail here.
+            # On auto, retry on CPU rather than failing the video.
+            if device == "cuda" or not _on_gpu(model) or not _GPU_LIBRARY_ERROR.search(str(e)):
+                raise
+            print(f"\n  Whisper: the GPU failed ({str(e)[:120]}); transcribing again on the CPU")
+            # Drop the failed accelerator model before loading its CPU replacement;
+            # otherwise both copies can occupy memory during the retry.
+            del model
+            gc.collect()
+            model = _load_model(model_size, "cpu")
+            segments, info = _run(model, video_path, language, hotwords)
+
+        # CTranslate2 releases its model when the Python wrapper is collected.
+        # Do so before another local model stage claims the AI memory slot.
+        del model
+        gc.collect()
 
     looped = _collapse_repetition_loops(segments)
     if looped:

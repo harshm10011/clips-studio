@@ -95,7 +95,13 @@ def _load():
     """Build the network and load the checkpoint. Cached: this is expensive
     and every clip in a video needs it."""
     global _model, _head
+    from core.gpu import torch_device
+
     if _model is not None:
+        target = torch_device()
+        if next(_model.parameters()).device.type != target:
+            _model.to(target)
+            _head.to(target)
         return _model, _head
 
     import torch
@@ -106,26 +112,31 @@ def _load():
 
     # NOT torch.cuda.is_available(): that answers 'is a driver and card
     # present', not 'can this build run on it'. See core/gpu.py.
-    from core.gpu import torch_device
+    from core.macos.acceleration import run_with_device_fallback
 
     device = torch_device()
-    model, head = talkNetModel().to(device), lossAV().to(device)
+    model, head = talkNetModel(), lossAV()
 
     # The checkpoint was saved from the training wrapper, so its keys carry
     # "model." and "lossAV." prefixes for the two halves.
-    state = torch.load(weights_path(), map_location=device, weights_only=True)
+    state = torch.load(weights_path(), map_location="cpu", weights_only=True)
     model.load_state_dict(
         {k[len("model."):]: v for k, v in state.items() if k.startswith("model.")}
     )
     head.load_state_dict(
         {k[len("lossAV."):]: v for k, v in state.items() if k.startswith("lossAV.")}
     )
+    run_with_device_fallback(
+        (model, head), device,
+        lambda target: (model.to(target), head.to(target)),
+        "TalkNet model load",
+    )
     model.eval()
     head.eval()
     _model, _head = model, head
     # Said once, like the tracker's "Tracking: GPU (CUDA) active": a job log
     # then shows which models a run actually started.
-    print(f"      Speaker detection (TalkNet) loaded on {device}")
+    print(f"      Speaker detection (TalkNet) loaded on {next(model.parameters()).device}")
     return _model, _head
 
 
@@ -195,36 +206,49 @@ def score_track(faces: np.ndarray, pcm: np.ndarray) -> np.ndarray:
     audio = audio[: frames * _MFCC_PER_FRAME]
     vis = faces[:frames]
 
-    passes = []
-    with torch.no_grad():
-        for seconds in _WINDOWS:
-            v_step = seconds * FPS
-            got = np.zeros(frames, dtype=np.float32)
-            # The windows are all the same length bar the last, so they go
-            # through as ONE batch rather than one call each. Same arithmetic,
-            # a fraction of the launches: scoring a 60s clip one window at a
-            # time took 23s, batched it takes a few.
-            whole = frames // v_step
-            for start, count, step in ((0, whole, v_step),
-                                       (whole * v_step, 1, frames - whole * v_step)):
-                if count == 0 or step < 2:
-                    continue
-                for lo in range(0, count, max(1, _BATCH_FRAMES // step)):
-                    n = min(count - lo, max(1, _BATCH_FRAMES // step))
-                    off = start + lo * step
-                    v = vis[off:off + n * step].reshape(n, step, FACE_SIZE, FACE_SIZE)
-                    a = audio[off * _MFCC_PER_FRAME:
-                              (off + n * step) * _MFCC_PER_FRAME]
-                    a = a.reshape(n, step * _MFCC_PER_FRAME, -1)
-                    at = torch.tensor(a, dtype=torch.float32, device=device)
-                    vt = torch.tensor(v, dtype=torch.float32, device=device)
-                    ae = model.forward_audio_frontend(at)
-                    ve = model.forward_visual_frontend(vt)
-                    ae, ve = model.forward_cross_attention(ae, ve)
-                    out = model.forward_audio_visual_backend(ae, ve)
-                    s = np.asarray(head.forward(out, labels=None)).reshape(-1)
-                    got[off:off + n * step] = s[: n * step]
-            passes.append(got)
+    def infer(target_device):
+        passes = []
+        with torch.no_grad():
+            for seconds in _WINDOWS:
+                v_step = seconds * FPS
+                got = np.zeros(frames, dtype=np.float32)
+                # The windows are all the same length bar the last, so they go
+                # through as ONE batch rather than one call each. Same arithmetic,
+                # a fraction of the launches: scoring a 60s clip one window at a
+                # time took 23s, batched it takes a few.
+                whole = frames // v_step
+                for start, count, step in ((0, whole, v_step),
+                                           (whole * v_step, 1, frames - whole * v_step)):
+                    if count == 0 or step < 2:
+                        continue
+                    for lo in range(0, count, max(1, _BATCH_FRAMES // step)):
+                        n = min(count - lo, max(1, _BATCH_FRAMES // step))
+                        off = start + lo * step
+                        v = vis[off:off + n * step].reshape(n, step, FACE_SIZE, FACE_SIZE)
+                        a = audio[off * _MFCC_PER_FRAME:
+                                  (off + n * step) * _MFCC_PER_FRAME]
+                        a = a.reshape(n, step * _MFCC_PER_FRAME, -1)
+                        at = torch.tensor(a, dtype=torch.float32, device=target_device)
+                        vt = torch.tensor(v, dtype=torch.float32, device=target_device)
+                        ae = model.forward_audio_frontend(at)
+                        ve = model.forward_visual_frontend(vt)
+                        ae, ve = model.forward_cross_attention(ae, ve)
+                        out = model.forward_audio_visual_backend(ae, ve)
+                        s = np.asarray(head.forward(out, labels=None)).reshape(-1)
+                        got[off:off + n * step] = s[: n * step]
+                passes.append(got)
+        return passes
+
+    from core.macos.acceleration import run_with_device_fallback
+    from core.macos.memory import ai_inference_slot
+    from core.gpu import torch_device
+
+    with ai_inference_slot("active speaker detection"):
+        selected = torch_device()
+        if next(model.parameters()).device.type != selected:
+            model.to(selected)
+            head.to(selected)
+        passes = run_with_device_fallback((model, head), selected, infer, "TalkNet inference")
 
     scores = np.mean(np.stack(passes), axis=0)
     if len(scores) < len(faces):  # pad the trimmed tail with its last value

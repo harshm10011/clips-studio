@@ -48,7 +48,7 @@ llm:
 whisper:
   model: auto           # auto = large-v3-turbo on GPU, small on CPU. Or force:
                         # tiny / base / small / medium / large-v3 / large-v3-turbo
-  device: auto          # cuda if available, else cpu
+  device: auto          # compatible CUDA if available, else CPU; MPS is not supported by CTranslate2
 
 # Where transcription runs. "local" is Whisper on this PC (the settings above),
 # the default. Or send the audio, on YOUR OWN API key, to a provider that

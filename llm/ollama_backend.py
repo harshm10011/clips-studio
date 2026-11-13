@@ -109,7 +109,10 @@ class OllamaBackend(LLMBackend):
         Any other error ends the job, as it always has, in words: a model
         Ollama doesn't have says so and where to get it (#149)."""
         for attempt in range(1, _TRIES + 1):
-            response = requests.post(f"{self.host}/api/generate", json=payload, timeout=self.timeout)
+            from core.macos.memory import ai_inference_slot
+
+            with ai_inference_slot("Ollama generation"):
+                response = requests.post(f"{self.host}/api/generate", json=payload, timeout=self.timeout)
             if 400 <= response.status_code < 500:
                 # Asking again won't change a refusal. raise_for_status() kept
                 # only "404 Client Error ... /api/generate", which is what the

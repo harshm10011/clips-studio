@@ -150,11 +150,15 @@ def _predict(model, frame, imgsz: int, conf: float, classes: list[int] | None, a
     flipped and rescaled copies, about three times as long). Returns
     [(class, conf, x0, y0, x1, y1)] in pixels."""
     from core.gpu import torch_device
+    from core.macos.acceleration import ensure_model_device
     from video.tracker import _infer_lock
+    from core.macos.memory import ai_inference_slot
 
-    with _infer_lock:
+    with _infer_lock, ai_inference_slot("basketball detection"):
+        device = torch_device()
+        ensure_model_device(model, device)
         results = model.predict(frame, classes=classes, conf=conf, imgsz=imgsz,
-                                device=torch_device(), verbose=False, augment=augment)
+                                device=device, verbose=False, augment=augment)
     out = []
     for r in results:
         boxes = r.boxes
@@ -223,11 +227,15 @@ class PoseHeads:
 
     def fill(self, frame, people: list[Person]) -> None:
         from core.gpu import torch_device
+        from core.macos.acceleration import ensure_model_device
         from video.tracker import _infer_lock
+        from core.macos.memory import ai_inference_slot
 
         fh, fw = frame.shape[:2]
-        with _infer_lock:
-            results = self.model.predict(frame, conf=PEOPLE_CONF, imgsz=self.imgsz, device=torch_device(),
+        with _infer_lock, ai_inference_slot("basketball pose detection"):
+            device = torch_device()
+            ensure_model_device(self.model, device)
+            results = self.model.predict(frame, conf=PEOPLE_CONF, imgsz=self.imgsz, device=device,
                                          verbose=False)
         heads = []
         for r in results:

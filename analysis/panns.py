@@ -115,13 +115,16 @@ def load():
     """The network with its weights, on the GPU when the build can use one.
     Cached: loading costs a second, a video only needs it once."""
     global _model
+    from core.gpu import torch_device
+
     if _model is not None:
+        target = torch_device()
+        if next(_model.parameters()).device.type != target:
+            _model.to(target)
         return _model
     import torch
 
     # NOT torch.cuda.is_available(): see core/gpu.py.
-    from core.gpu import torch_device
-
     device = torch_device()
     state = torch.load(weights_path(), map_location="cpu", weights_only=True)
     state = state.get("model", state)
@@ -133,9 +136,12 @@ def load():
     state["melW"] = state.pop("logmel_extractor.melW")
     state["window"] = model.window
     model.load_state_dict(state)
-    model.eval().to(device)
+    from core.macos.acceleration import run_with_device_fallback
+
+    run_with_device_fallback(model, device, lambda target: model.to(target), "PANNs model load")
+    model.eval()
     _model = model
-    print(f"      Game sounds (PANNs) loaded on {device}")
+    print(f"      Game sounds (PANNs) loaded on {next(model.parameters()).device}")
     return _model
 
 
@@ -145,9 +151,19 @@ def tag(windows: np.ndarray, batch: int = 32) -> np.ndarray:
 
     model = load()
     device = next(model.parameters()).device
-    out = []
-    with torch.inference_mode():
-        for i in range(0, len(windows), batch):
-            x = torch.from_numpy(np.ascontiguousarray(windows[i:i + batch], dtype=np.float32)).to(device)
-            out.append(model(x).float().cpu().numpy())
-    return np.concatenate(out) if out else np.zeros((0, CLASSES), dtype=np.float32)
+    from core.macos.memory import ai_inference_slot
+    from core.macos.acceleration import run_with_device_fallback
+
+    def infer(target_device):
+        out = []
+        with torch.inference_mode():
+            for i in range(0, len(windows), batch):
+                x = torch.from_numpy(np.ascontiguousarray(windows[i:i + batch], dtype=np.float32))
+                out.append(model(x.to(target_device)).float().cpu().numpy())
+        return np.concatenate(out) if out else np.zeros((0, CLASSES), dtype=np.float32)
+
+    with ai_inference_slot("PANNs"):
+        selected = torch_device()
+        if next(model.parameters()).device.type != selected:
+            model.to(selected)
+        return run_with_device_fallback(model, selected, infer, "PANNs inference")

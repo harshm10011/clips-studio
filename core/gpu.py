@@ -26,6 +26,7 @@ crash halfway through their video.
 NO_GPU = "no CUDA GPU detected"
 
 _DEVICE: str | None = None
+_DEVICE_REASON: str | None = None
 
 
 def gpu_too_old(reason: str) -> bool:
@@ -119,7 +120,7 @@ def cuda_usable() -> tuple[bool, str]:
 
 
 def torch_device() -> str:
-    """`"cuda"` or `"cpu"` — the device every model and inference call must use.
+    """`"mps"`, `"cuda"` or `"cpu"` — the selected PyTorch device.
 
     Exists because "don't move the model to CUDA" turned out not to be enough.
     Ultralytics rebuilds its predictor on each call with
@@ -135,8 +136,27 @@ def torch_device() -> str:
     Cached: cuda_usable() imports torch and queries the driver, and this is
     called per frame. The answer cannot change inside one process.
     """
-    global _DEVICE
+    global _DEVICE, _DEVICE_REASON
     if _DEVICE is None:
-        usable, _ = cuda_usable()
-        _DEVICE = "cuda" if usable else "cpu"
+        from core.macos.acceleration import mps_usable
+
+        mps, mps_reason = mps_usable()
+        if mps:
+            _DEVICE, _DEVICE_REASON = "mps", mps_reason
+        else:
+            cuda, cuda_reason = cuda_usable()
+            _DEVICE = "cuda" if cuda else "cpu"
+            _DEVICE_REASON = cuda_reason if cuda else f"{mps_reason}; {cuda_reason}"
     return _DEVICE
+
+
+def torch_device_info() -> tuple[str, str]:
+    """The selected PyTorch device and the reason it was chosen."""
+    device = torch_device()
+    return device, _DEVICE_REASON or f"PyTorch device: {device}"
+
+
+def force_torch_cpu(reason: str) -> None:
+    """Demote the process-wide PyTorch choice after a real model probe fails."""
+    global _DEVICE, _DEVICE_REASON
+    _DEVICE, _DEVICE_REASON = "cpu", reason

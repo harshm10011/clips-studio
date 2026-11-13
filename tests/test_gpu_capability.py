@@ -101,6 +101,11 @@ def _patch(monkeypatch, fake):
     torch = pytest.importorskip("torch", reason="torch is not installed on CI")
 
     monkeypatch.setattr(torch, "cuda", fake)
+    from core.macos import acceleration
+
+    # These cases assert CUDA decisions. An M4 developer machine may have real
+    # MPS available, which torch_device correctly prefers in production.
+    monkeypatch.setattr(acceleration, "mps_usable", lambda torch_module=None: (False, "MPS test disabled"))
 
 
 def test_reports_no_gpu_distinctly(monkeypatch):
@@ -211,12 +216,24 @@ def test_torch_device_follows_usability(monkeypatch):
     from core import gpu
 
     monkeypatch.setattr(gpu, "_DEVICE", None)
+    monkeypatch.setattr(gpu, "_DEVICE_REASON", None)
     _patch(monkeypatch, _FakeCuda(available=True, archs=SHIPPED, capability=(6, 1)))
     assert gpu.torch_device() == "cpu"
 
     monkeypatch.setattr(gpu, "_DEVICE", None)
+    monkeypatch.setattr(gpu, "_DEVICE_REASON", None)
     _patch(monkeypatch, _FakeCuda(available=True, archs=SHIPPED, capability=(8, 6)))
     assert gpu.torch_device() == "cuda"
+
+
+def test_torch_device_prefers_mps(monkeypatch):
+    from core import gpu
+    from core.macos import acceleration
+
+    monkeypatch.setattr(gpu, "_DEVICE", None)
+    monkeypatch.setattr(gpu, "_DEVICE_REASON", None)
+    monkeypatch.setattr(acceleration, "mps_usable", lambda torch_module=None: (True, "Apple MPS"))
+    assert gpu.torch_device_info() == ("mps", "Apple MPS")
 
 
 # ---------------------------------------------------------------------------

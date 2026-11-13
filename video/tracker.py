@@ -82,6 +82,7 @@ from video.framing import HoldMove, is_cut, small_gray, stable_target
 _CUT_DIFF_SAMPLED = 55.0
 
 _model = None  # loaded once per process; YOLO init is expensive
+_model_device = "cpu"
 # The single YOLO instance is shared across parallel render threads, and
 # ultralytics inference is NOT thread-safe on one model. This serializes the
 # GPU inference (the GPU runs one at a time anyway) while FFmpeg encodes —
@@ -94,13 +95,18 @@ _thread_local = threading.local()
 
 
 def _get_model(model_name: str):
-    global _model
+    global _model, _model_device
     with _infer_lock:
+        from core.gpu import force_torch_cpu, torch_device, torch_device_info
+
+        if _model is not None:
+            _sync_model_device(_model)
+            return _model
+
         if _model is None:
             from ultralytics import YOLO  # lazy: heavy import, pulls in torch
 
             from core.binaries import yolo_weights
-            from core.gpu import cuda_usable
 
             # Absolute path, not the bare name: ultralytics resolves a bare
             # name against the working directory and downloads it when that
@@ -109,29 +115,46 @@ def _get_model(model_name: str):
             # fails outright on a machine with no route to GitHub.
             _model = YOLO(yolo_weights(model_name))
 
-            usable, reason = cuda_usable()
-            if not usable:
+            device, reason = torch_device_info()
+            _model_device = device
+            if device == "cpu":
                 print(f"  Tracking: using CPU — {reason}")
             else:
-                _model.to("cuda")
-                # Prove the GPU before the whole job depends on it. Moving
-                # weights launches no kernel, so .to("cuda") succeeds even on a
-                # card this build has no code for, and the failure would
-                # otherwise surface at the first predict() — thousands of
-                # frames into someone's video, as a crash rather than a
-                # fallback. One throwaway inference buys that back.
+                # Prove the selected accelerator before the whole job depends
+                # on it. Moving weights launches no kernel, so a small real
+                # prediction catches unsupported MPS/CUDA operations here.
                 #
                 # Calls predict directly rather than _detect, which would
                 # deadlock on the non-reentrant lock already held here.
                 try:
-                    _model.predict(np.zeros((32, 32, 3), np.uint8),
-                                   device="cuda", verbose=False)
+                    from core.macos.memory import ai_inference_slot
+
+                    with ai_inference_slot("YOLO accelerator probe"):
+                        _model.to(device)
+                        _model.predict(np.zeros((32, 32, 3), np.uint8),
+                                       device=device, verbose=False)
                 except Exception as e:
                     _model.to("cpu")
-                    print(f"  Tracking: GPU unusable ({str(e)[:90]}) — using CPU")
+                    _model_device = "cpu"
+                    reason = f"{device.upper()} inference probe failed ({str(e)[:90]})"
+                    force_torch_cpu(reason)
+                    print(f"  Tracking: accelerator unusable ({str(e)[:90]}) — using CPU")
                 else:
-                    print(f"  Tracking: GPU (CUDA) active — {reason}")
+                    label = "Apple MPS" if device == "mps" else "GPU (CUDA)"
+                    print(f"  Tracking: {label} active — {reason}")
     return _model
+
+
+def _sync_model_device(model) -> str:
+    """Keep the cached YOLO weights aligned with a process-wide CPU fallback."""
+    global _model_device
+    from core.gpu import torch_device
+
+    target = torch_device()
+    if _model_device != target:
+        model.to(target)
+        _model_device = target
+    return target
 
 
 def _get_cascades():
@@ -1381,14 +1404,16 @@ def _detect(model, frame, min_confidence) -> list[tuple]:
     head is (head_cx_px, head_cy_px, head_w_px) from the nose/eye/ear keypoints — the most
     reliable "where is the head" signal there is (needs no visible face). With
     a plain detection model, head is None and the Haar face box fills in."""
-    from core.gpu import torch_device
-
     with _infer_lock:
         # device= is not optional. Without it ultralytics calls
         # select_device(''), which auto-selects the first available GPU and
         # silently undoes the CPU decision _get_model just made.
-        results = model.predict(frame, classes=[0], conf=min_confidence,
-                                device=torch_device(), verbose=False)
+        from core.macos.memory import ai_inference_slot
+
+        with ai_inference_slot("YOLO tracking"):
+            device = _sync_model_device(model)
+            results = model.predict(frame, classes=[0], conf=min_confidence,
+                                    device=device, verbose=False)
     out = []
     for r in results:
         kp = getattr(r, "keypoints", None)

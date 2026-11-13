@@ -328,6 +328,14 @@ def test_gpu_absence_is_not_blocking():
     assert check.blocking is False
 
 
+def test_preflight_reports_apple_mps(monkeypatch):
+    monkeypatch.setattr("core.gpu.torch_device_info", lambda: ("mps", "Apple MPS"))
+    check = preflight.check_gpu()
+    assert check.ok is True
+    assert "Apple MPS" in check.detail
+    assert "Whisper uses CPU" in check.detail
+
+
 def test_disk_is_not_blocking(tmp_path):
     check = preflight.check_disk(tmp_path)
     assert check.blocking is False

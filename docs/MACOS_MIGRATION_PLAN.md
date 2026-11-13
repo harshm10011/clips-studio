@@ -17,6 +17,16 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 
 ## Milestone 02 — M4 runtime and AI
 
+**Status: first implementation complete; real MPS/Core ML runtime validation remains pending.**
+
+- Added `core/macos` hardware, acceleration, memory-profile, and local Ollama diagnostics, plus `scripts/diagnose_macos.py`.
+- PyTorch device selection now prefers MPS, validates YOLO accelerators with a small real inference, and retries on CPU when a model cannot run. Local transcription, Ollama and vision inference share one heavy AI slot.
+- A 16 GB profile recommends the repository's tested `gemma3:4b` and limits one heavy AI job at a time. The recommendation does not overwrite the user's model setting.
+- Local Whisper weights are dropped after transcription. On machines at or below 24 GB, a locally hosted Ollama model is asked to unload after each completed video; remote Ollama hosts are never sent unload requests. Unused PyTorch cache is also cleared at the job boundary.
+- FFmpeg is queried for VideoToolbox encoders. Whisper stays on CPU on MPS because the current faster-whisper/CTranslate2 backend has no MPS or Core ML path.
+- Core ML is detected as a macOS system runtime. Python conversion tools and WhisperKit are reported separately; neither is installed in this environment, so no Core ML transcription path is claimed.
+- Hardware report and pure-Python profile tests pass. No M4 inference benchmark has run yet because Ollama and an MPS-enabled PyTorch build are absent.
+
 - Report ARM64 architecture, unified memory, MPS availability, Ollama status, FFmpeg encoders, and free disk space.
 - Keep one heavyweight inference job at a time on the 16 GB machine.
 - Keep the working CPU transcription path while benchmarking local Apple-native options (MLX Whisper or a Core ML bridge).
@@ -55,5 +65,6 @@ After this works reliably, polish the Mac-first onboarding, model manager, setti
 
 - The public fork `harshm10011/clips-studio` and its `macos/m4-support` branch are created. The local Git metadata is outside the workspace because this managed checkout does not permit `.git` writes.
 - GitHub CLI is absent; `origin` and `upstream` are configured in the local Git checkout.
-- Python 3.11, pytest, project Python dependencies, UI `node_modules`, and Ollama are not installed. Python 3.14.2 is present and cannot be used for the promised frozen runtime build.
-- The macOS package, Apple inference paths, and rendering pipeline have not been built or exercised yet.
+- Python 3.11, pytest, most project Python dependencies, UI `node_modules`, Ollama, `coremltools`, and WhisperKit are not installed. Python 3.14.2 is present and cannot be used for the promised frozen runtime build.
+- This environment's PyTorch reports MPS unavailable. The MPS path has mocked coverage, but real Apple inference and end-to-end rendering still need an MPS-enabled dependency build.
+- The macOS package and production rendering pipeline have not been built or exercised yet.

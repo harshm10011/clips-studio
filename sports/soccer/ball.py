@@ -63,6 +63,7 @@ COLOUR_GATE = 0.2       # a sample pair is checked frame by frame for a cut only
                         # CUT_COL, the least colour change any of its rules takes on the cut's frame
 
 _models: dict = {}
+_models_device: dict = {}
 _models_lock = threading.Lock()
 
 
@@ -184,29 +185,52 @@ def _model(name: str):
     """The detector for the ball and the players: its own cache, since the
     face tracker's holds whichever model it was first asked for."""
     with _models_lock:
+        from core.gpu import force_torch_cpu, torch_device, torch_device_info
+        from core.macos.memory import ai_inference_slot
+
+        target = torch_device()
         if name not in _models:
             from ultralytics import YOLO
 
             from core.binaries import yolo_weights
-            from core.gpu import cuda_usable
 
             model = YOLO(yolo_weights(name))
-            usable, _reason = cuda_usable()
-            if usable:
-                model.to("cuda")
+            device, reason = torch_device_info()
+            target = device
+            if device == "cpu":
+                model.to("cpu")
+            else:
+                try:
+                    with ai_inference_slot("sports YOLO probe"):
+                        model.to(device)
+                        model.predict(np.zeros((32, 32, 3), np.uint8), device=device, verbose=False)
+                except Exception as exc:
+                    model.to("cpu")
+                    force_torch_cpu(f"{device.upper()} sports model probe failed ({str(exc)[:90]})")
+                    print(f"      Sports detector: accelerator unavailable ({str(exc)[:90]}) — using CPU")
+                else:
+                    print(f"      Sports detector: {device.upper()} active — {reason}")
             _models[name] = model
+            _models_device[name] = target
+        elif _models_device.get(name) != target:
+            _models[name].to(target)
+            _models_device[name] = target
         return _models[name]
 
 
 def detect(model, frame, imgsz: int) -> tuple[list, list]:
     """(balls [(x, y, conf)], people [(x, y, w, h)]) in frame fractions."""
     from core.gpu import torch_device
+    from core.macos.acceleration import ensure_model_device
     from video.tracker import _infer_lock
+    from core.macos.memory import ai_inference_slot
 
     h, w = frame.shape[:2]
-    with _infer_lock:
+    with _infer_lock, ai_inference_slot("soccer detection"):
+        device = torch_device()
+        ensure_model_device(model, device)
         results = model.predict(frame, classes=[PERSON, BALL], conf=BALL_CONF, imgsz=imgsz,
-                                device=torch_device(), verbose=False)
+                                device=device, verbose=False)
     balls, people = [], []
     for r in results:
         for b in r.boxes:
