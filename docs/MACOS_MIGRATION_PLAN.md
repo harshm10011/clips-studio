@@ -64,6 +64,16 @@ Target product: a local-first macOS fork of Clips Kitty, with no paid AI API req
 - Added Command+1–8 navigation on macOS (Control+1–8 on Windows/Linux) in sidebar order, with the active destination exposed to assistive technology.
 - UI dependencies are not installed here, so the packaged M4 visual review and build are still pending.
 
+## Prompt phase 06 — Automatic subtitles and video editor
+
+**Status: editor and export extensions implemented; real render review remains pending.**
+
+- The project already has 9:16 speaker tracking, 16:9 longform output, word-timed captions, Hindi/English transcription, caption corrections, manual trims, an exact render preview, FFmpeg output, and VideoToolbox H.264 selection with software fallback.
+- Added a per-clip 1:1 square format. It renders at 1080×1080 with a centered crop; the editor labels that choice and keeps the preview, watermark, captions, and final render on the square canvas. Choose Vertical to use the existing AI speaker-tracking crop.
+- Added caption templates plus controls for outline colour/width and a background box with colour/opacity. Added common macOS fonts and automatic macOS script-font choices for supported languages.
+- Added H.265 MP4 export and selectable 4, 8, or 12 Mb/s encoding. macOS tries VideoToolbox first, then FFmpeg's libx265; default H.264 export still copies the already-rendered file.
+- UI dependencies are absent here, and no M4 sample render or hardware encoder run has been performed. H.265 availability depends on the FFmpeg build; the export path reports an error if neither the hardware nor software encoder is available.
+
 ## Milestone 03 — Native macOS process and package
 
 - Build the Python 3.11 backend for ARM64 with PyInstaller on macOS.

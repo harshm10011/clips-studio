@@ -154,13 +154,17 @@ export default function EditorView({
   const [previewSrc, setPreviewSrc] = useState<string | null>(null)
   const [watermark, setWatermark] = useState<WatermarkConfig | null>(clip.render_opts?.watermark ?? null)
   const [liveOverlay, setLiveOverlay] = useState<LiveOverlay | null>(null)
-  const isLandscape = !!clip.render_opts?.profile
+  const savedAspect = clip.render_opts?.aspect_ratio ?? (clip.render_opts?.profile ? 'landscape' : 'vertical')
+  const [aspectRatio, setAspectRatio] = useState<'vertical' | 'square' | 'landscape'>(savedAspect)
+  const isLandscape = aspectRatio === 'landscape'
+  const isSquare = aspectRatio === 'square'
 
   const [translated, setTranslated] = useState<TranslationPreview | null>(null)
 
   useEffect(() => {
     setPreviewSrc(null)
     setWatermark(clip.render_opts?.watermark ?? null)
+    setAspectRatio(clip.render_opts?.aspect_ratio ?? (clip.render_opts?.profile ? 'landscape' : 'vertical'))
     setLiveOverlay(null)
     setTranslated(null)
   }, [clip.id])
@@ -254,7 +258,7 @@ export default function EditorView({
         <div className="lg:col-span-2 sticky top-6 space-y-2">
           <div
             className={`relative mx-auto max-w-full ${
-              isLandscape ? 'w-full aspect-video' : 'h-[74vh] aspect-[9/16]'
+              isLandscape ? 'w-full aspect-video' : isSquare ? 'w-full max-h-[74vh] aspect-square' : 'h-[74vh] aspect-[9/16]'
             }`}
           >
             <video
@@ -287,14 +291,15 @@ export default function EditorView({
               </span>
             )}
           </div>
-          {isLandscape && (
-            <p className="text-center text-xs text-muted">Longform clip — 1920×1080 horizontal</p>
-          )}
+          {isLandscape && <p className="text-center text-xs text-muted">Landscape — 1920×1080</p>}
+          {isSquare && <p className="text-center text-xs text-muted">Square — 1080×1080 center crop</p>}
         </div>
         <div className="lg:col-span-3 min-w-0 space-y-4">
           <TimelineEditor
             clip={clip}
             videoRef={videoRef}
+            aspectRatio={aspectRatio}
+            setAspectRatio={setAspectRatio}
             onChanged={onChanged}
             onPreview={setPreviewSrc}
             onLiveOverlay={setLiveOverlay}

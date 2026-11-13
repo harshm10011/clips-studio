@@ -203,6 +203,7 @@ class PreviewIn(BaseModel):
     speaker_edits: list | None = None
     # pending Captions on/off switch; None keeps the clip's saved choice
     captions: bool | None = None
+    aspect_ratio: str | None = None  # vertical | square | landscape
 
 
 class CreatorGamingLayoutIn(BaseModel):
@@ -326,11 +327,15 @@ class AgentIn(BaseModel):
 
 class ExportIn(BaseModel):
     folder: str
+    codec: str = "h264"
+    bitrate_kbps: int | None = None
 
 
 class BatchExportIn(BaseModel):
     clip_ids: list[int]
     folder: str
+    codec: str = "h264"
+    bitrate_kbps: int | None = None
 
 
 class ModelIn(BaseModel):
@@ -1939,6 +1944,8 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
 
         opts = json.loads(row["render_opts"]) if row["render_opts"] else {}
         opts["edit"] = body.edit  # pending edit (None = cleared)
+        if body.aspect_ratio in ("vertical", "square", "landscape"):
+            opts["aspect_ratio"] = body.aspect_ratio
         if body.caption_lines is not None:
             opts["caption_lines"] = body.caption_lines
         if body.crop:
@@ -2475,15 +2482,21 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
 
     @app.post("/clips/{clip_id}/export")
     def export_clip(clip_id: int, body: ExportIn):
-        return {"exported": _export([clip_id], Path(body.folder))}
+        return {"exported": _export([clip_id], Path(body.folder), body.codec, body.bitrate_kbps)}
 
     @app.post("/export/batch")
     def export_batch(body: BatchExportIn):
-        return {"exported": _export(body.clip_ids, Path(body.folder))}
+        return {"exported": _export(body.clip_ids, Path(body.folder), body.codec, body.bitrate_kbps)}
 
-    def _export(clip_ids: list[int], folder: Path) -> list[str]:
+    def _export(
+        clip_ids: list[int], folder: Path, codec: str = "h264", bitrate_kbps: int | None = None
+    ) -> list[str]:
         from core.state import _now
 
+        if codec not in ("h264", "h265"):
+            raise HTTPException(422, "Choose H.264 or H.265 for export.")
+        if bitrate_kbps is not None and not 1000 <= bitrate_kbps <= 50000:
+            raise HTTPException(422, "Export bitrate must be between 1,000 and 50,000 kb/s.")
         folder.mkdir(parents=True, exist_ok=True)
         d = db()
         exported = []
@@ -2494,7 +2507,15 @@ def create_app(config: dict, settings_path: Path) -> FastAPI:
                     continue
                 name = _slugify(row["title"] or row["hook"] or Path(row["path"]).stem)
                 target = _unique_path(folder, name)
-                shutil.copy2(row["path"], target)
+                if codec == "h264" and bitrate_kbps is None:
+                    shutil.copy2(row["path"], target)
+                else:
+                    from video.export import transcode_export
+
+                    try:
+                        transcode_export(Path(row["path"]), target, codec, bitrate_kbps)
+                    except RuntimeError as exc:
+                        raise HTTPException(422, str(exc)) from exc
                 exported.append(str(target))
                 d.set_clip(cid, exported_at=_now())  # Export all skips it from now on
                 _log_feedback(d, row, "exported")  # exports = strongest "keep" signal

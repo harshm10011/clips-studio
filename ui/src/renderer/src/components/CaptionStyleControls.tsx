@@ -7,6 +7,11 @@ export const DEFAULT_CAPTION_STYLE: Required<CaptionStyle> = {
   font_size: 84,
   color: '#FFFFFF',
   position: 'bottom',
+  outline_width: 7,
+  outline_color: '#000000',
+  background_style: 'none',
+  background_color: '#000000',
+  background_opacity: 0.7,
   words_per_caption: 3,
   uppercase: true,
   highlight: false,
@@ -15,8 +20,8 @@ export const DEFAULT_CAPTION_STYLE: Required<CaptionStyle> = {
   second_speaker_color: '#5CE1FF'
 }
 
-/** Fonts on every stock Windows install — matches video/captions.py FONTS. */
-export const CAPTION_FONTS = [
+/** Shared Windows fonts plus native macOS choices accepted by video/captions.py. */
+const STOCK_CAPTION_FONTS = [
   'Arial',
   'Arial Black',
   'Impact',
@@ -27,6 +32,12 @@ export const CAPTION_FONTS = [
   'Georgia',
   'Comic Sans MS',
   'Courier New'
+]
+export const CAPTION_FONTS = [
+  ...STOCK_CAPTION_FONTS,
+  ...(window.studio?.platform === 'darwin'
+    ? ['Avenir Next', 'Helvetica Neue', 'Menlo', 'Kohinoor Devanagari', 'Kohinoor Bangla']
+    : [])
 ]
 
 /** Live example of how the burned-in captions will look (9:16 mock). */
@@ -59,8 +70,12 @@ function CaptionExample({ style }: { style: Required<CaptionStyle> }): JSX.Eleme
           // 84px at 1920 tall ≈ scale into this ~176px-tall mock
           fontSize: `${(style.font_size / 1920) * 176 * 2.2}px`,
           fontWeight: 700,
-          WebkitTextStroke: '0.8px black',
-          textShadow: '1px 1px 2px rgba(0,0,0,0.9)'
+          WebkitTextStroke: `${Math.max(0, style.outline_width * 0.3)}px ${style.outline_color}`,
+          textShadow: style.outline_width > 0 ? '1px 1px 2px rgba(0,0,0,0.9)' : 'none',
+          borderRadius: style.background_style === 'box' ? '6px' : undefined,
+          background: style.background_style === 'box'
+            ? `${style.background_color}${Math.round(style.background_opacity * 255).toString(16).padStart(2, '0')}`
+            : undefined
         }}
       >
         {style.highlight
@@ -102,8 +117,79 @@ export default function CaptionStyleControls({
   /** Translated subtitles are burned in one colour, whoever is talking. */
   hideSecondSpeaker?: boolean
 }): JSX.Element {
+  const applyPreset = (preset: string): void => {
+    if (preset === 'clean') {
+      onChange('font', 'Arial')
+      onChange('font_size', 60)
+      onChange('color', '#FFFFFF')
+      onChange('position', 'bottom')
+      onChange('outline_width', 2)
+      onChange('outline_color', '#000000')
+      onChange('background_style', 'none')
+      onChange('background_color', '#000000')
+      onChange('background_opacity', 0.7)
+      if (!hideWordsPerCaption) onChange('words_per_caption', 4)
+      onChange('uppercase', false)
+      onChange('highlight', false)
+      onChange('highlight_color', '#FFE600')
+      if (!hideSecondSpeaker) {
+        onChange('second_speaker', false)
+        onChange('second_speaker_color', '#5CE1FF')
+      }
+    } else if (preset === 'karaoke') {
+      onChange('font', 'Arial Black')
+      onChange('font_size', 88)
+      onChange('color', '#FFFFFF')
+      onChange('position', 'middle')
+      onChange('outline_width', 8)
+      onChange('outline_color', '#000000')
+      onChange('background_style', 'none')
+      onChange('background_color', '#000000')
+      onChange('background_opacity', 0.7)
+      if (!hideWordsPerCaption) onChange('words_per_caption', 3)
+      onChange('uppercase', true)
+      onChange('highlight', true)
+      onChange('highlight_color', '#FFE600')
+      if (!hideSecondSpeaker) {
+        onChange('second_speaker', false)
+        onChange('second_speaker_color', '#5CE1FF')
+      }
+    } else if (preset === 'conversation') {
+      onChange('font', 'Trebuchet MS')
+      onChange('font_size', 72)
+      onChange('color', '#FFFFFF')
+      onChange('position', 'bottom')
+      onChange('outline_width', 4)
+      onChange('outline_color', '#000000')
+      onChange('background_style', 'box')
+      onChange('background_color', '#111115')
+      onChange('background_opacity', 0.76)
+      if (!hideWordsPerCaption) onChange('words_per_caption', 3)
+      onChange('uppercase', false)
+      onChange('highlight', false)
+      onChange('highlight_color', '#FFE600')
+      if (!hideSecondSpeaker) {
+        onChange('second_speaker', true)
+        onChange('second_speaker_color', '#A78BFA')
+      }
+    }
+  }
   return (
     <>
+      <div>
+        <label htmlFor={`${idPrefix}-preset`} className="label">Caption template</label>
+        <select
+          id={`${idPrefix}-preset`}
+          className="input mt-1"
+          defaultValue=""
+          onChange={(e) => applyPreset(e.target.value)}
+        >
+          <option value="" disabled>Choose a starting style…</option>
+          <option value="clean">Clean</option>
+          <option value="karaoke">Karaoke highlight</option>
+          <option value="conversation">Conversation box</option>
+        </select>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label htmlFor={`${idPrefix}-font`} className="label">
@@ -164,6 +250,69 @@ export default function CaptionStyleControls({
             <option value="top">Top</option>
           </select>
         </div>
+        <div>
+          <label htmlFor={`${idPrefix}-outline`} className="label">Outline ({style.outline_width}px)</label>
+          <input
+            id={`${idPrefix}-outline`}
+            type="range"
+            min={0}
+            max={16}
+            className="mt-3 w-full accent-control"
+            value={style.outline_width}
+            onChange={(e) => onChange('outline_width', Number(e.target.value))}
+          />
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-outline-color`} className="label">Outline colour</label>
+          <input
+            id={`${idPrefix}-outline-color`}
+            type="color"
+            className="mt-1 h-9 w-full rounded-lg bg-raised cursor-pointer"
+            value={style.outline_color}
+            onChange={(e) => onChange('outline_color', e.target.value.toUpperCase())}
+          />
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-background`} className="label">Background</label>
+          <select
+            id={`${idPrefix}-background`}
+            className="input mt-1"
+            value={style.background_style}
+            onChange={(e) => onChange('background_style', e.target.value as CaptionStyle['background_style'])}
+          >
+            <option value="none">None</option>
+            <option value="box">Caption box</option>
+          </select>
+        </div>
+        {style.background_style === 'box' && (
+          <>
+            <div>
+              <label htmlFor={`${idPrefix}-background-color`} className="label">Box colour</label>
+              <input
+                id={`${idPrefix}-background-color`}
+                type="color"
+                className="mt-1 h-9 w-full rounded-lg bg-raised cursor-pointer"
+                value={style.background_color}
+                onChange={(e) => onChange('background_color', e.target.value.toUpperCase())}
+              />
+            </div>
+            <div>
+              <label htmlFor={`${idPrefix}-background-opacity`} className="label">
+                Box opacity ({Math.round(style.background_opacity * 100)}%)
+              </label>
+              <input
+                id={`${idPrefix}-background-opacity`}
+                type="range"
+                min={0.1}
+                max={1}
+                step={0.05}
+                className="mt-3 w-full accent-control"
+                value={style.background_opacity}
+                onChange={(e) => onChange('background_opacity', Number(e.target.value))}
+              />
+            </div>
+          </>
+        )}
         {!hideWordsPerCaption && (
           <div>
             <label htmlFor={`${idPrefix}-words`} className="label">

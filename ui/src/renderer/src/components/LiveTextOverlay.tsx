@@ -91,9 +91,9 @@ export default function LiveTextOverlay({
     )
   }
 
-  const outline = (px: number): React.CSSProperties => ({
-    WebkitTextStroke: `${Math.max(1, px)}px black`,
-    textShadow: `0 ${Math.max(1, 2 * s)}px ${Math.max(2, 5 * s)}px rgba(0,0,0,0.85)`
+  const outline = (px: number, color = 'black'): React.CSSProperties => ({
+    WebkitTextStroke: px <= 0 ? '0 transparent' : `${Math.max(0.5, px)}px ${color}`,
+    textShadow: px <= 0 ? 'none' : `0 ${Math.max(1, 2 * s)}px ${Math.max(2, 5 * s)}px rgba(0,0,0,0.85)`
   })
 
   return (
@@ -133,8 +133,12 @@ export default function LiveTextOverlay({
             fontSize: `${capSize}px`,
             fontWeight: 700,
             color: lineColor,
-            padding: `0 ${60 * s}px`,
-            ...outline(3.5 * s)
+            padding: st.background_style === 'box' ? `${16 * s}px ${60 * s}px` : `0 ${60 * s}px`,
+            borderRadius: st.background_style === 'box' ? `${10 * s}px` : undefined,
+            background: st.background_style === 'box'
+              ? `${st.background_color}${Math.round(st.background_opacity * 255).toString(16).padStart(2, '0')}`
+              : undefined,
+            ...outline(st.outline_width * s, st.outline_color)
           }}
         >
           {st.highlight ? (

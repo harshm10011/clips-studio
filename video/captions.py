@@ -13,6 +13,7 @@ enabled).
 """
 
 import re
+import sys
 from pathlib import Path
 
 from core.models import ClipCandidate, Segment
@@ -22,6 +23,11 @@ DEFAULT_STYLE = {
     "font_size": 84,          # at 1080x1920 playback resolution
     "color": "#FFFFFF",       # text colour (hex RGB)
     "position": "bottom",     # bottom | middle | top
+    "outline_width": 7,
+    "outline_color": "#000000",
+    "background_style": "none",
+    "background_color": "#000000",
+    "background_opacity": 0.7,
     "words_per_caption": 3,
     "uppercase": True,
     "highlight": False,           # light up each word as it is spoken
@@ -50,6 +56,24 @@ FONTS = [
     "Malgun Gothic",
     "Microsoft YaHei",
     "Leelawadee UI",
+    # Common macOS font families, used when the app runs on Apple hardware.
+    "Avenir Next",
+    "Helvetica Neue",
+    "Menlo",
+    "Kohinoor Devanagari",
+    "Kohinoor Bangla",
+    "Kohinoor Tamil",
+    "Kohinoor Telugu",
+    "Gujarati Sangam MN",
+    "Kannada Sangam MN",
+    "Malayalam Sangam MN",
+    "Gurmukhi MN",
+    "Sinhala Sangam MN",
+    "Hiragino Kaku Gothic ProN",
+    "Apple SD Gothic Neo",
+    "PingFang SC",
+    "Thonburi",
+    "Geeza Pro",
 ]
 
 # The classic caption fonts only cover Latin/Cyrillic/Greek. Burning e.g.
@@ -69,15 +93,25 @@ SCRIPT_FONTS = {
     "ar": "Segoe UI", "fa": "Segoe UI", "ur": "Segoe UI",
 }
 
-_LATIN_ONLY = set(FONTS[:10])
+MAC_SCRIPT_FONTS = {
+    "hi": "Kohinoor Devanagari", "mr": "Kohinoor Devanagari", "ne": "Kohinoor Devanagari",
+    "bn": "Kohinoor Bangla", "ta": "Kohinoor Tamil", "te": "Kohinoor Telugu",
+    "gu": "Gujarati Sangam MN", "kn": "Kannada Sangam MN", "ml": "Malayalam Sangam MN",
+    "pa": "Gurmukhi MN", "si": "Sinhala Sangam MN", "ja": "Hiragino Kaku Gothic ProN",
+    "ko": "Apple SD Gothic Neo", "zh": "PingFang SC", "th": "Thonburi",
+    "ar": "Geeza Pro", "fa": "Geeza Pro", "ur": "Geeza Pro",
+}
+
+_LATIN_ONLY = set(FONTS[:10]) | {"Avenir Next", "Helvetica Neue", "Menlo"}
 
 
 def caption_font_for(language: str, chosen: str | None) -> str | None:
     """The font captions should actually burn with: the user's choice,
     unless the content language needs a script that choice can't render."""
     lang = (language or "en").lower()
-    if lang in SCRIPT_FONTS and (chosen is None or chosen in _LATIN_ONLY):
-        return SCRIPT_FONTS[lang]
+    script_fonts = MAC_SCRIPT_FONTS if sys.platform == "darwin" else SCRIPT_FONTS
+    if lang in script_fonts and (chosen is None or chosen in _LATIN_ONLY):
+        return script_fonts[lang]
     return chosen
 
 # position -> (ASS numpad alignment, vertical margin)
@@ -587,12 +621,25 @@ def _highlighted(
 def _header(opts: dict, canvas: tuple[int, int] = (1080, 1920)) -> str:
     alignment, margin_v = _POSITIONS.get(opts["position"], _POSITIONS["bottom"])
     color = _ass_color(opts["color"])
+    outline_color = _ass_color(opts.get("outline_color") or "#000000")
+    try:
+        outline = max(0, min(16, int(opts.get("outline_width", 7))))
+    except (TypeError, ValueError):
+        outline = 7
+    background_box = opts.get("background_style") == "box"
+    try:
+        opacity = max(0.0, min(1.0, float(opts.get("background_opacity", 0.7))))
+    except (TypeError, ValueError):
+        opacity = 0.7
+    back_alpha = round((1.0 - opacity) * 255)
+    back_color = _ass_color(opts.get("background_color") or "#000000", back_alpha)
     size = max(40, min(140, int(opts["font_size"])))
     font = opts.get("font") if opts.get("font") in FONTS else "Arial"
     # Style values are calibrated for the 1920-tall Shorts canvas; scale
     # them to whatever frame this clip renders at (e.g. landscape 1080).
     scale = canvas[1] / 1920
     size = max(24, round(size * scale))
+    outline = round(outline * scale)
     margin_v = round(margin_v * scale)
     return f"""[Script Info]
 ScriptType: v4.00+
@@ -602,20 +649,20 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font},{size},{color},{color},&H00000000,&H7F000000,-1,0,0,0,100,100,0,0,1,7,2,{alignment},60,60,{margin_v},1
+Style: Default,{font},{size},{color},{color},{outline_color},{back_color},-1,0,0,0,100,100,0,0,{3 if background_box else 1},{outline},{0 if background_box else 2},{alignment},60,60,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
 
-def _ass_color(hex_rgb: str) -> str:
+def _ass_color(hex_rgb: str, alpha: int = 0) -> str:
     """#RRGGBB -> ASS &H00BBGGRR (ASS stores colours little-endian)."""
     h = hex_rgb.lstrip("#")
     if len(h) != 6:
         return "&H00FFFFFF"
     r, g, b = h[0:2], h[2:4], h[4:6]
-    return f"&H00{b}{g}{r}".upper()
+    return f"&H{max(0, min(255, int(alpha))):02X}{b}{g}{r}".upper()
 
 
 def _inline_color(hex_rgb: str) -> str:

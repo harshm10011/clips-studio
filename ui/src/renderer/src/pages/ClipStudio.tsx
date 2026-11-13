@@ -11,6 +11,7 @@ import ProcessingBar from '../components/ProcessingBar'
 import PublishAllDialog from '../components/PublishAllDialog'
 import ScheduleView from '../components/ScheduleView'
 import { api } from '../lib/api'
+import ExportOptions, { type ExportBitrate, type ExportCodec } from '../components/ExportOptions'
 import type { Provider } from '../lib/uploadpost'
 import { getExportFolder } from '../lib/exportFolder'
 import { useEvents } from '../lib/useEvents'
@@ -47,6 +48,8 @@ export default function ClipStudio({
   const [clipType, setClipType] = useState<'all' | 'shorts' | 'longform'>('all')
   const [exportingAll, setExportingAll] = useState(false)
   const [exportNotice, setExportNotice] = useState<string | null>(null)
+  const [exportCodec, setExportCodec] = useState<ExportCodec>('h264')
+  const [exportBitrate, setExportBitrate] = useState<ExportBitrate>('source')
   const pendingClip = useRef<number | null>(null)
   // A re-rendered clip's old id and its new one (clip_replaced, below).
   const moved = useRef(new Map<number, number>())
@@ -230,14 +233,10 @@ export default function ClipStudio({
   }, [openCreator])
 
   const shownClips = useMemo(
-    () =>
-      clips.filter((c) =>
-        clipType === 'all'
-          ? true
-          : clipType === 'longform'
-            ? !!c.render_opts?.profile
-            : !c.render_opts?.profile
-      ),
+    () => clips.filter((c) => {
+      const aspect = c.render_opts?.aspect_ratio ?? (c.render_opts?.profile ? 'landscape' : 'vertical')
+      return clipType === 'all' ? true : clipType === 'longform' ? aspect === 'landscape' : aspect !== 'landscape'
+    }),
     [clips, clipType]
   )
   const toExport = useMemo(() => shownClips.filter((c) => !c.exported_at), [shownClips])
@@ -253,7 +252,11 @@ export default function ClipStudio({
     try {
       const res = await api.exportBatch(
         toExport.map((c) => c.id),
-        folder
+        folder,
+        {
+          codec: exportCodec,
+          bitrateKbps: exportBitrate === 'source' ? undefined : Number(exportBitrate)
+        }
       )
       const n = res.exported.length
       const missing = toExport.length - n
@@ -380,6 +383,12 @@ export default function ClipStudio({
                   </button>
                 ))}
               </div>
+              <ExportOptions
+                codec={exportCodec}
+                bitrate={exportBitrate}
+                onCodec={setExportCodec}
+                onBitrate={setExportBitrate}
+              />
               <button
                 className="btn-accent !py-1 !px-3 text-xs ml-auto"
                 onClick={exportAll}

@@ -230,6 +230,8 @@ export default function TimelineEditor({
   onTranslationPreview,
   watermark,
   setWatermark,
+  aspectRatio,
+  setAspectRatio,
   tabRequest
 }: {
   clip: Clip
@@ -241,6 +243,8 @@ export default function TimelineEditor({
   onTranslationPreview: (p: TranslationPreview | null) => void
   watermark: WatermarkConfig | null
   setWatermark: (w: WatermarkConfig | null) => void
+  aspectRatio: 'vertical' | 'square' | 'landscape'
+  setAspectRatio: (value: 'vertical' | 'square' | 'landscape') => void
   /** Lets the editor header open a tab. `n` increments on every press so
    *  clicking the same button twice still re-opens it; activeTab lives here,
    *  and lifting it out just for one button would be a lot of plumbing. */
@@ -273,10 +277,12 @@ export default function TimelineEditor({
   // force the full frame on a blurred backdrop, Center = static center crop.
   const storedCrop = clip.render_opts?.crop ?? 'track'
   const [layout, setLayout] = useState<string>(storedCrop)
-  const isLandscape = !!clip.render_opts?.profile
+  const storedAspectRatio = clip.render_opts?.aspect_ratio ?? (clip.render_opts?.profile ? 'landscape' : 'vertical')
+  const isLandscape = aspectRatio === 'landscape'
+  const isSquare = aspectRatio === 'square'
   // Vertical Live keeps the live's own 9:16 layout: there is no crop to
   // choose, so the Layout buttons would do nothing.
-  const isVerticalLive = !!clip.render_opts?.vertical_live
+  const isVerticalLive = aspectRatio === 'vertical' && !!clip.render_opts?.vertical_live
   // Gaming / Reaction split (gaming/run.py): the webcam in one half, the game
   // or the video being reacted to in the other. null = not a split clip.
   const storedGaming: GamingSettings | null = clip.render_opts?.gaming ?? null
@@ -367,6 +373,7 @@ export default function TimelineEditor({
     setNotice('')
     setDraftEditJson(null)
     setLayout(clip.render_opts?.crop ?? 'track')
+    setAspectRatio(clip.render_opts?.aspect_ratio ?? (clip.render_opts?.profile ? 'landscape' : 'vertical'))
     setGaming(clip.render_opts?.gaming ?? null)
     setGamingOpen(false)
     setRememberGaming(false)
@@ -845,12 +852,14 @@ export default function TimelineEditor({
   }
 
   const layoutDirty = layout !== storedCrop
+  const aspectDirty = aspectRatio !== storedAspectRatio
   const gamingDirty = JSON.stringify(gaming) !== JSON.stringify(storedGaming)
   const styleDirty = JSON.stringify(captionStyle) !== JSON.stringify(storedStyle)
   const captionsDirty = captionsOn !== storedCaptionsOn
   const wmDirty = JSON.stringify(watermark) !== JSON.stringify(storedWatermark)
   const dirty =
     layoutDirty ||
+    aspectDirty ||
     gamingDirty ||
     (rememberGaming && !!gaming) ||
     styleDirty ||
@@ -863,6 +872,7 @@ export default function TimelineEditor({
     JSON.stringify({
       e: edit,
       l: layout,
+      a: aspectRatio,
       g: gaming,
       s: captionStyle,
       o: captionsOn,
@@ -971,7 +981,8 @@ export default function TimelineEditor({
         wmDirty ? (watermark ?? {}) : undefined,
         gamingDirty ? gaming : undefined,
         speakerDirty ? pendingSpeakerEdits() : undefined,
-        captionsDirty ? captionsOn : undefined
+        captionsDirty ? captionsOn : undefined,
+        aspectRatio
       )
       setDraftEditJson(pendingJson())
       onPreview(res.url)
@@ -1067,6 +1078,7 @@ export default function TimelineEditor({
       edit: isDefault(edit, duration) ? null : edit
     }
     if (layoutDirty) renderOpts.crop = layout
+    if (aspectDirty) renderOpts.aspect_ratio = aspectRatio
     // null turns the split off for this clip; settings turn it on or change it.
     if (gamingDirty) renderOpts.gaming = gaming
     if (styleDirty) renderOpts.caption_style = captionStyle
@@ -1097,7 +1109,7 @@ export default function TimelineEditor({
     },
     // A layout is never set where the Layout buttons don't show, nor on a
     // split: another layout there would switch the split off.
-    noLayout: isLandscape ? 'landscape' : isVerticalLive ? 'vertical_live' : gaming ? 'gaming' : undefined
+    noLayout: isLandscape || isSquare ? 'landscape' : isVerticalLive ? 'vertical_live' : gaming ? 'gaming' : undefined
   }
   const suggestionView = useMemo(
     () => suggestionCards(suggestions, { edit, layout }, uses, suggestionClip),
@@ -1112,6 +1124,7 @@ export default function TimelineEditor({
       wordsRead,
       gaming,
       isLandscape,
+      isSquare,
       isVerticalLive,
       clip.start_s,
       clip.end_s
@@ -1392,6 +1405,19 @@ export default function TimelineEditor({
           <Film size={15} /> Edit video
         </p>
         <div className="flex gap-3 text-xs items-center">
+          <label className="inline-flex items-center gap-1.5 text-muted">
+            Format
+            <select
+              className="bg-raised text-ink border border-raised rounded-md px-2 py-1"
+              aria-label={t('Output format')}
+              value={aspectRatio}
+              onChange={(e) => setAspectRatio(e.target.value as 'vertical' | 'square' | 'landscape')}
+            >
+              <option value="vertical">9:16 Vertical</option>
+              <option value="square">1:1 Square</option>
+              <option value="landscape">16:9 Landscape</option>
+            </select>
+          </label>
           <button
             className="text-muted hover:text-ink inline-flex items-center gap-1.5"
             onClick={() => setShowKeys(true)}
@@ -1413,6 +1439,7 @@ export default function TimelineEditor({
             onClick={() => {
               push(defaultEdit(duration))
               setLayout('track')
+              setAspectRatio(storedAspectRatio)
               setGaming(storedGaming)
               setRememberGaming(false)
               setCaptionStyle({ ...DEFAULT_CAPTION_STYLE, ...(clip.render_opts?.caption_style ?? {}) })
@@ -1873,7 +1900,7 @@ export default function TimelineEditor({
               </div>
               <WatermarkControls
                 config={watermark}
-                landscape={isLandscape}
+                landscape={isLandscape || isSquare}
                 onChange={(patch) => setWatermark({ ...(watermark ?? DEFAULT_WATERMARK), ...patch })}
               />
               <p className="text-[11px] text-muted/70">Tip: drag it on the preview to place it exactly.</p>
@@ -1958,10 +1985,13 @@ export default function TimelineEditor({
       )}
 
       {/* layout override (vertical Shorts only) — in the Effects tab */}
-      {activeTab === 'motion' && !isLandscape && isVerticalLive && (
+      {activeTab === 'motion' && isSquare && (
+        <p className="text-xs text-muted">Square uses a centered 1:1 crop. Choose Vertical for AI speaker tracking.</p>
+      )}
+      {activeTab === 'motion' && !isLandscape && !isSquare && isVerticalLive && (
         <p className="text-xs text-muted">Layout: Vertical Live keeps the stream’s own 9:16 layout.</p>
       )}
-      {activeTab === 'motion' && !isLandscape && !isVerticalLive && (
+      {activeTab === 'motion' && !isLandscape && !isSquare && !isVerticalLive && (
         <div className="flex items-center gap-2 text-xs flex-wrap">
           <span className="text-muted">Layout</span>
           {(

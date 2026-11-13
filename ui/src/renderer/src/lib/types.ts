@@ -281,6 +281,11 @@ export interface CaptionStyle {
   font_size?: number
   color?: string
   position?: 'bottom' | 'middle' | 'top'
+  outline_width?: number
+  outline_color?: string
+  background_style?: 'none' | 'box'
+  background_color?: string
+  background_opacity?: number
   words_per_caption?: number
   uppercase?: boolean
   /** Light up each word as it is spoken (the short-form caption look). */
@@ -370,6 +375,8 @@ export interface Word {
 }
 
 export interface RenderOpts {
+  /** Output canvas for this clip; unset keeps the source job's format. */
+  aspect_ratio?: 'vertical' | 'square' | 'landscape'
   crop?: 'track' | 'center' | 'bias_left' | 'bias_right' | 'letterbox'
   captions?: boolean
   /** False when the job that made the clip had captions off (#128); the

@@ -334,15 +334,32 @@ export const api = {
         ...(suggestions ? { suggestions } : {})
       })
     }),
-  exportClip: (id: number, folder: string) =>
+  exportClip: (
+    id: number,
+    folder: string,
+    options?: { codec?: 'h264' | 'h265'; bitrateKbps?: number }
+  ) =>
     request<{ exported: string[] }>(`/clips/${id}/export`, {
       method: 'POST',
-      body: JSON.stringify({ folder })
+      body: JSON.stringify({
+        folder,
+        codec: options?.codec ?? 'h264',
+        bitrate_kbps: options?.bitrateKbps ?? null
+      })
     }),
-  exportBatch: (clipIds: number[], folder: string) =>
+  exportBatch: (
+    clipIds: number[],
+    folder: string,
+    options?: { codec?: 'h264' | 'h265'; bitrateKbps?: number }
+  ) =>
     request<{ exported: string[] }>('/export/batch', {
       method: 'POST',
-      body: JSON.stringify({ clip_ids: clipIds, folder })
+      body: JSON.stringify({
+        clip_ids: clipIds,
+        folder,
+        codec: options?.codec ?? 'h264',
+        bitrate_kbps: options?.bitrateKbps ?? null
+      })
     }),
   mediaUrl: (clipId: number) => `${API_BASE}/media/${clipId}`,
   clipWords: (clipId: number) => request<{ words: Word[] }>(`/clips/${clipId}/words`),
@@ -358,7 +375,8 @@ export const api = {
      *  ones, an empty list = none. */
     speakerEdits?: SpeakerTurn[],
     /** The pending Captions switch; undefined = the clip's saved choice. */
-    captions?: boolean
+    captions?: boolean,
+    aspectRatio?: 'vertical' | 'square' | 'landscape'
   ) =>
     request<{ url: string }>(`/clips/${clipId}/preview`, {
       method: 'POST',
@@ -372,7 +390,8 @@ export const api = {
         gaming: gaming ?? null,
         gaming_off: gaming === null,
         speaker_edits: speakerEdits ?? null,
-        captions: captions ?? null
+        captions: captions ?? null,
+        aspect_ratio: aspectRatio ?? null
       })
     }),
   /** A frame of the clip's SOURCE video, `at` (0-1) of the way through, to

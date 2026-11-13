@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { getExportFolder, pickExportFolder, setExportFolder } from '../lib/exportFolder'
+import ExportOptions, { type ExportBitrate, type ExportCodec } from './ExportOptions'
 import { Folder, Scissors } from './icons'
 import type { Clip, PluginNote } from '../lib/types'
 import { t } from '../lib/i18n'
@@ -41,6 +42,8 @@ export default function ClipEditor({
   const [start, setStart] = useState(clip.start_s)
   const [end, setEnd] = useState(clip.end_s)
   const [folder, setFolder] = useState('')
+  const [exportCodec, setExportCodec] = useState<ExportCodec>('h264')
+  const [exportBitrate, setExportBitrate] = useState<ExportBitrate>('source')
 
   // Default the export destination to the remembered folder / OS Downloads.
   useEffect(() => {
@@ -94,7 +97,10 @@ export default function ClipEditor({
 
   const exportOne = (): Promise<void> =>
     run('export', async () => {
-      const res = await api.exportClip(clip.id, folder)
+      const res = await api.exportClip(clip.id, folder, {
+        codec: exportCodec,
+        bitrateKbps: exportBitrate === 'source' ? undefined : Number(exportBitrate)
+      })
       flash(res.exported.length ? `Exported: ${res.exported[0]}` : 'Nothing exported')
       onChanged() // exporting stars the clip; show it on its card
     })
@@ -277,6 +283,12 @@ export default function ClipEditor({
         >
           <Folder />
         </button>
+        <ExportOptions
+          codec={exportCodec}
+          bitrate={exportBitrate}
+          onCodec={setExportCodec}
+          onBitrate={setExportBitrate}
+        />
         <button className="btn-ghost" onClick={exportOne} disabled={busy !== null}>
           {busy === 'export' ? t('Exporting…') : t('Export')}
         </button>

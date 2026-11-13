@@ -1510,10 +1510,13 @@ def _render_files(
     wants_card = _outro.enabled(config)
     render_path = clip_dir / f"{stem}.pre-card.mp4" if wants_card else final_path
 
-    # Longform rendering profile (render_opts["profile"], set only by the
-    # longform module): 16:9 1920x1080 output, no vertical crop/tracking.
-    # Absent for every existing Shorts clip — their path is unchanged.
-    landscape = bool(opts.get("profile"))
+    # A per-clip aspect choice overrides the longform profile. Older clips
+    # have no aspect_ratio and retain their historical profile-based format.
+    requested_aspect = opts.get("aspect_ratio")
+    aspect_ratio = (requested_aspect if requested_aspect in ("vertical", "square", "landscape")
+                    else "landscape" if opts.get("profile") else "vertical")
+    landscape = aspect_ratio == "landscape"
+    square = aspect_ratio == "square"
     # Loudness: on unless this clip opted out (see settings/editor).
     normalize = bool(opts.get("normalize_audio", True))
     # Podcast: opt-in, per video. Multi-cam footage is framed shot by shot, one
@@ -1527,7 +1530,7 @@ def _render_files(
     # so editor re-renders keep it.
     from core import modes
 
-    vertical_live = not landscape and (modes.is_vertical_live(opts) or modes.is_vertical_live(config))
+    vertical_live = aspect_ratio == "vertical" and (modes.is_vertical_live(opts) or modes.is_vertical_live(config))
     # A match (the Sports toggle, sports/): framed by the ball and the play.
     # From the job or the clip's saved options, so re-renders keep it.
     sport_name = modes.sport(opts) or modes.sport(config)
@@ -1542,12 +1545,12 @@ def _render_files(
     # on to the standard layout below. Off -> never imported.
     # A split turned off for this clip in the editor ("gaming": null) stays
     # off in a job that has it on (D33).
-    gaming = (not landscape and not vertical_live and not podcast
+    gaming = (not landscape and not square and not vertical_live and not podcast
               and (modes.is_gaming(opts)
                    or (modes.is_gaming(config) and not ("gaming" in opts and opts["gaming"] is None))))
     gaming_kept = None
     framing_quality = None   # the sport framing's quality, saved with the clip
-    canvas = (1920, 1080) if landscape else (1080, 1920)
+    canvas = (1920, 1080) if landscape else (1080, 1080) if square else (1080, 1920)
 
     # Color: preset filter (per-clip wins over job/config default) + manual
     # brightness/saturation/contrast adjustments.
@@ -1557,6 +1560,14 @@ def _render_files(
         fit = (
             "scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,"
             "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1"
+        )
+        vf_extra = f"{fit},{vf_extra}" if vf_extra else fit
+    elif square:
+        # Square exports use a predictable center crop and keep their captions
+        # on the square canvas. Vertical remains the opt-in path for AI tracking.
+        fit = (
+            "scale=1080:1080:force_original_aspect_ratio=increase:flags=lanczos,"
+            "crop=1080:1080,setsar=1"
         )
         vf_extra = f"{fit},{vf_extra}" if vf_extra else fit
     elif vertical_live:
@@ -1665,7 +1676,7 @@ def _render_files(
         # Vertical Live takes the single-encode branch below, like longform:
         # the tracked path (intermediate cut, face tracking, TalkNet, layout
         # decisions, frames through Python) is never entered.
-        if config["clips"].get("vertical", True) and not landscape and not vertical_live:
+        if config["clips"].get("vertical", True) and not landscape and not square and not vertical_live:
             # Cut a horizontal intermediate, track the subject, render 9:16.
             intermediate = clip_dir / f"{stem}.source.mp4"
             scratch.append(intermediate)
